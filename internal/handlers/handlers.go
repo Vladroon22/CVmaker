@@ -5,40 +5,80 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"os"
 	"time"
 
+	"github.com/Vladroon22/CVmaker/internal/database"
+	"github.com/Vladroon22/CVmaker/internal/service"
+	golog "github.com/Vladroon22/GoLog"
 	"github.com/dgrijalva/jwt-go"
+	"github.com/gorilla/mux"
 )
 
 const (
 	TTL = time.Hour
 )
 
-var signKey = os.Getenv("JWT")
-
-type MyClaims struct {
-	jwt.StandardClaims
-	UserId int `json:"id"`
+type Handlers struct {
+	handler *mux.Router
+	logg    *golog.Logger
+	router  *database.Repo
+	srv     *service.Service
 }
 
-func HomePage(w http.ResponseWriter, r *http.Request) {
-
+func NewHandler(r *database.Repo, h *mux.Router, l *golog.Logger, s *service.Service) *Handlers {
+	return &Handlers{
+		router:  r,
+		handler: h,
+		logg:    l,
+		srv:     s,
+	}
 }
 
-func Register(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) HomePage(w http.ResponseWriter, r *http.Request) {}
 
+func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
+	user := h.srv.UserInput
+	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	id, err := h.router.CreateUser(user.Name, user.Password, user.Email)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"id": id,
+	})
 }
 
-func SignIn(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) SignIn(w http.ResponseWriter, r *http.Request) {
+	user := h.srv.UserInput
+	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
+	token, err := h.router.GenerateJWT(user.Password, user.Email)
+	if err != nil {
+		h.logg.Errorln(err)
+		return
+	}
+
+	setCookie(w, "jwt", token)
 }
 
-func MakeCV(w http.ResponseWriter, r *http.Request) {
-
+func (h *Handlers) MakeCV(w http.ResponseWriter, r *http.Request) {
+	cv := h.srv.UserInput
+	if err := json.NewDecoder(r.Body).Decode(&cv); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
-func LogOut(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) LogOut(w http.ResponseWriter, r *http.Request) {
 	clearCookie(w, "jwt", "")
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
@@ -67,7 +107,7 @@ func clearCookie(w http.ResponseWriter, cookieName string, cookies string) {
 	http.SetCookie(w, cookie)
 }
 
-func AuthMiddleWare(next http.Handler) http.Handler {
+func AuthMiddleWare(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie("jwt")
 		if err != nil {
@@ -85,13 +125,13 @@ func AuthMiddleWare(next http.Handler) http.Handler {
 		}
 		r = r.WithContext(context.WithValue(r.Context(), "id", claims.UserId))
 
-		next.ServeHTTP(w, r)
+		next(w, r)
 	})
 }
 
-func validateToken(tokenStr string) (*MyClaims, error) {
-	token, err := jwt.ParseWithClaims(tokenStr, &MyClaims{}, func(token *jwt.Token) (interface{}, error) {
-		return signKey, nil
+func validateToken(tokenStr string) (*database.MyClaims, error) {
+	token, err := jwt.ParseWithClaims(tokenStr, &database.MyClaims{}, func(token *jwt.Token) (interface{}, error) {
+		return database.SignKey, nil
 	})
 	if err != nil {
 		if err == jwt.ErrSignatureInvalid {
@@ -100,7 +140,7 @@ func validateToken(tokenStr string) (*MyClaims, error) {
 		return nil, errors.New("Bad-Request")
 	}
 
-	claims, ok := token.Claims.(*MyClaims)
+	claims, ok := token.Claims.(*database.MyClaims)
 	if !ok || !token.Valid {
 		return nil, errors.New("Unauthorized")
 	}

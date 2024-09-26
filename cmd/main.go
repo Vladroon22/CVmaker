@@ -9,6 +9,7 @@ import (
 	"github.com/Vladroon22/CVmaker/config"
 	"github.com/Vladroon22/CVmaker/internal/database"
 	"github.com/Vladroon22/CVmaker/internal/handlers"
+	"github.com/Vladroon22/CVmaker/internal/service"
 	golog "github.com/Vladroon22/GoLog"
 	"github.com/gorilla/mux"
 )
@@ -24,13 +25,18 @@ func main() {
 	}
 
 	router := mux.NewRouter()
-	router.HandleFunc("/", handlers.HomePage)
-	router.HandleFunc("/sign-up", handlers.Register)
-	router.HandleFunc("/sign-in", handlers.SignIn)
-	router.HandleFunc("/makeCV", handlers.MakeCV)
-	router.HandleFunc("/logout", handlers.LogOut)
+	srv := service.NewService()
+	repo := database.NewRepo(db, cnf, srv)
+	r := handlers.NewHandler(repo, router, logger, srv)
+
+	router.HandleFunc("/", r.HomePage).Methods("GET")
+	router.HandleFunc("/sign-up", r.Register).Methods("POST")
+	router.HandleFunc("/sign-in", handlers.AuthMiddleWare(r.SignIn)).Methods("POST")
+	router.HandleFunc("/makeCV", r.MakeCV).Methods("POST")
+	router.HandleFunc("/logout", r.LogOut).Methods("GET")
 
 	go http.ListenAndServe(cnf.Addr_PORT, router)
+	logger.Infoln("Server is listening -->" + cnf.Addr_PORT)
 
 	exitSig := make(chan os.Signal, 1)
 	signal.Notify(exitSig, syscall.SIGINT, syscall.SIGTERM)
