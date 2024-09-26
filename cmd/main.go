@@ -24,19 +24,20 @@ func main() {
 		return
 	}
 
-	router := mux.NewRouter()
 	srv := service.NewService()
 	repo := database.NewRepo(db, cnf, srv)
-	r := handlers.NewHandler(repo, router, logger, srv)
+	r := handlers.NewHandler(repo, mux.NewRouter(), logger, srv)
 
-	router.HandleFunc("/", r.HomePage).Methods("GET")
-	router.HandleFunc("/sign-up", r.Register).Methods("POST")
-	router.HandleFunc("/sign-in", handlers.AuthMiddleWare(r.SignIn)).Methods("POST")
-	router.HandleFunc("/makeCV", r.MakeCV).Methods("POST")
-	router.HandleFunc("/logout", r.LogOut).Methods("GET")
+	r.R.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./web"))))
 
-	go http.ListenAndServe(cnf.Addr_PORT, router)
-	logger.Infoln("Server is listening -->" + cnf.Addr_PORT)
+	r.R.HandleFunc("/", r.HomePage).Methods("GET")
+	r.R.HandleFunc("/sign-up", r.Register).Methods("GET", "POST")
+	r.R.HandleFunc("/sign-in", handlers.AuthMiddleWare(r.SignIn)).Methods("GET", "POST")
+	r.R.HandleFunc("/makeCV", r.MakeCV).Methods("GET", "POST")
+	r.R.HandleFunc("/logout", r.LogOut).Methods("GET")
+
+	go http.ListenAndServe(cnf.Addr_PORT, r.R)
+	logger.Infoln("Server is listening --> " + cnf.Addr_PORT)
 
 	exitSig := make(chan os.Signal, 1)
 	signal.Notify(exitSig, syscall.SIGINT, syscall.SIGTERM)
@@ -48,4 +49,6 @@ func main() {
 			return
 		}
 	}()
+
+	logger.Infoln("Gracefull shutdown")
 }

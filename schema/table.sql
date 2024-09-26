@@ -1,7 +1,27 @@
 -- Active: 1727369093383@@127.0.0.1@5433@postgres
 CREATE TABLE IF NOT EXISTS CVs (
-
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(15) NOT NULL,
+    surname VARCHAR(20) NOT NULL,
+    email_cv VARCHAR(40) NOT NULL UNIQUE,
+    living_city VARCHAR(30) NOT NULL,
+    salary INT NOT NULL,
+    phone_number VARCHAR(15),
+    education VARCHAR(50)
 );
+
+CREATE TABLE Skills (
+    id SERIAL PRIMARY KEY,
+    skill_name VARCHAR(255) UNIQUE NOT NULL
+);
+
+
+CREATE TABLE CV_Skills (
+    cv_id INT REFERENCES CV(id) ON DELETE CASCADE,
+    skill_id INT REFERENCES Skills(id) ON DELETE CASCADE,
+    PRIMARY KEY (cv_id, skill_id)
+);
+
 
 CREATE TABLE IF NOT EXISTS users (
     name VARCHAR(10)
@@ -10,4 +30,9 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 DROP TABLE IF EXISTS CVs;
+
+DROP TABLE IF EXISTS CV_Skills; 
+
+DROP TABLE IF EXISTS Skills;
+
 DROP TABLE IF EXISTS users;
