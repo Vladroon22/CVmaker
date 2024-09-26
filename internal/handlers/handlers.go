@@ -116,8 +116,6 @@ func (h *Handlers) MakeCV(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, errTx.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	http.Redirect(w, r, "/makeCV", http.StatusSeeOther)
 }
 
 func (h *Handlers) LogOut(w http.ResponseWriter, r *http.Request) {
