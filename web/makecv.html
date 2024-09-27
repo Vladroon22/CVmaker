@@ -9,7 +9,11 @@
 <body>
     <div class="content"> 
         <h1>Create Your CV</h1>
-        <form method="POST" action="/makeCV"> <!-- Оставляем только один метод POST -->
+        <form method="POST" action="/makeCV">
+            <div class="input-group">
+                <label for="profession">Profession</label>
+                <input type="text" id="profession" name="profession" placeholder="Enter profession" required>
+            </div>
             <div class="input-group">
                 <label for="username">Name</label>
                 <input type="text" id="username" name="name" placeholder="Enter name" required>
@@ -42,11 +46,13 @@
                 <label for="skills">Skills</label>
                 <input type="text" id="skills" name="skills" placeholder="Enter your skills" required>
             </div>
-            <button type="submit" class="btn">Create it</button> <!-- Кнопка отправки формы -->
+            <form>
+                <button type="submit" class="btn">Create it</button> 
+            </form>
         </form>
         <br>
         <form action="/listCV" method="GET">
-            <button type="submit" class="btn">View CV List</button> <!-- Отдельная кнопка для перехода к списку резюме -->
+            <button type="submit" class="btn">View CV List</button>
         </form>
     </div>    
 </body>

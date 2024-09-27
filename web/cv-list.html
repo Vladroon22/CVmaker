@@ -4,32 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CV List</title>
-    <link rel="stylesheet" href="/static/cv-style.css"> <!-- Подключение CSS -->
+    <link rel="stylesheet" href="/static/cv-style.css"> 
 </head>
 <body>
     <div class="container">
         <h1>List of CVs</h1>
-        <div>
-            <form action="/makeCV" method="GET">   
-                <button type="submit" class="btn">Create New CV</button>
-            </form>
-        </div>
         <table>
             <thead>
                 <tr>
-                    <th>ID</th> <!-- Добавлено поле для ID -->
-                    <th>Profession</th> <!-- Добавлено поле для профессии -->
+                    <th>ID</th> 
+                    <th>Profession</th> 
                 </tr>
             </thead>
             <tbody>
                 {{range .}}
                 <tr>
-                    <td>{{.ID}}</td> <!-- Отображаем ID -->
-                    <td>{{.Profession}}</td> <!-- Отображаем профессию -->
+                    <td><form action="/profile" method="GET"><button type="submit" class="btn">{{.ID}}</button></form></td> 
+                    <td><form action="/profile" method="GET"><button type="submit" class="btn">{{.Profession}}</button></form></td> 
                 </tr>
                 {{end}}
             </tbody>
         </table>
+        <form action="/makeCV" method="GET"><button type="submit" class="btn">Create New CV</button></form>
     </div>
 </body>
 </html>

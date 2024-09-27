@@ -42,3 +42,18 @@ tr:nth-child(even) {
 tr:hover {
     background-color: #ddd;
 }
+
+.btn {
+    display: block;
+    width: 100%;
+    padding: 10px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn:hover {
+    background-color: #45a049;
+}
