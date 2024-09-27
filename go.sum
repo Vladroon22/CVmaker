@@ -1,5 +1,5 @@
-github.com/Vladroon22/GoLog v0.0.0-20240926161149-89b97d49d54f h1:3rPkk49eRD5rONR3EXWTycinB/K7E2UhK9l/c7Ckx08=
-github.com/Vladroon22/GoLog v0.0.0-20240926161149-89b97d49d54f/go.mod h1:VwTlvmAC9pLOlvAUMsfYKSo4NNpnUnkhmdj2nCD2tqg=
+github.com/Vladroon22/GoLog v0.0.0-20240926234652-1217ac9f0860 h1:rVkf2awo0LdVeCHiUyzDEsa6xqONuCmL4hcx3r51ah0=
+github.com/Vladroon22/GoLog v0.0.0-20240926234652-1217ac9f0860/go.mod h1:VwTlvmAC9pLOlvAUMsfYKSo4NNpnUnkhmdj2nCD2tqg=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible h1:7qlOGliEKZXTDg6OTjfoBKDXWrumCAMpl/TFQ4/5kLM=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/gorilla/mux v1.8.1 h1:TuBL49tXwgrFYWhqrNgrUNEY92u81SPhu7sTdzQEiWY=

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/cv-style.css">
+    <title>CV Maker</title>
+</head>
+<body>
+    <h1>{{.Name}} {{.Surname}}'s Profile</h1>
+    
+    <p><strong>Age:</strong> {{.Age}}</p>
+    <p><strong>Profession:</strong> {{.Profession}}</p>
+    <p><strong>Living City:</strong> {{.LivingCity}}</p>
+    <p><strong>Salary Expectation:</strong> {{.Salary}}</p>
+    <p><strong>Email:</strong> {{.EmailCV}}</p>
+    <p><strong>Phone:</strong> {{.PhoneNumber}}</p>
+    <p><strong>Education:</strong> {{.Education}}</p>
+
+    <h2>Skills</h2>
+    <ul>
+        {{range .Skills}}
+            <li>{{.}}</li>
+        {{end}}
+    </ul>
+</body>
+</html>

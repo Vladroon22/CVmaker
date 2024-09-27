@@ -11,9 +11,6 @@
     <div class="content">
         <div class="registration-form">
             <h2>Sign-Up</h2>
-            {{if .Error}}
-            <div class="error">{{.Error}}</div>
-            {{end}}
             <form action="/sign-up" method="POST" method="GET">
                 <div class="input-group">
                     <label for="username">Username</label>
@@ -27,7 +24,9 @@
                     <label for="password">Password</label>
                     <input type="password" id="password" name="password" placeholder="Enter password" required>
                 </div>
-                <button type="submit" class="btn">Sign Up</button>
+                <form>
+                    <button type="submit" class="btn">Sign Up</button>
+                </form>
             </form>
         </div>
     </div>

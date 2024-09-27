@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CV List</title>
+    <link rel="stylesheet" href="/static/cv-style.css"> <!-- Подключение CSS -->
+</head>
+<body>
+    <div class="container">
+        <h1>List of CVs</h1>
+        <div>
+            <form action="/makeCV" method="GET">   
+                <button type="submit" class="btn">Create New CV</button>
+            </form>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th> <!-- Добавлено поле для ID -->
+                    <th>Profession</th> <!-- Добавлено поле для профессии -->
+                </tr>
+            </thead>
+            <tbody>
+                {{range .}}
+                <tr>
+                    <td>{{.ID}}</td> <!-- Отображаем ID -->
+                    <td>{{.Profession}}</td> <!-- Отображаем профессию -->
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

@@ -20,6 +20,11 @@ const (
 	TTL = time.Hour
 )
 
+type PageUsersCV struct {
+	ID         int
+	Profession string
+}
+
 type PageData struct {
 	Error string
 }
@@ -29,6 +34,7 @@ type Handlers struct {
 	logg *golog.Logger
 	repo *database.Repo
 	srv  *service.Service
+	data []PageUsersCV
 }
 
 func NewHandler(r *database.Repo, h *mux.Router, l *golog.Logger, s *service.Service) *Handlers {
@@ -37,6 +43,7 @@ func NewHandler(r *database.Repo, h *mux.Router, l *golog.Logger, s *service.Ser
 		R:    h,
 		logg: l,
 		srv:  s,
+		data: make([]PageUsersCV, 10),
 	}
 }
 
@@ -51,52 +58,79 @@ func (h *Handlers) HomePage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
+	tmpl, err := template.ParseFiles("./web/sign-up.html")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	err = tmpl.Execute(w, PageData{})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.logg.Errorln(err)
+		return
+	}
 	user := h.srv.UserInput
 	user.Name = r.FormValue("username")
 	user.Password = r.FormValue("password")
 	user.Email = r.FormValue("email")
 
-	id, err := h.repo.CreateUser(user.Name, user.Password, user.Email)
-	if err != nil {
+	if err := h.repo.CreateUser(user.Name, user.Password, user.Email); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.logg.Errorln(err)
 		return
 	}
-
-	WriteJSON(w, http.StatusOK, map[string]interface{}{
-		"id": id,
-	})
-
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func (h *Handlers) SignIn(w http.ResponseWriter, r *http.Request) {
 	user := h.srv.UserInput
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.logg.Errorln(err)
+		return
+	}
+
 	user.Password = r.FormValue("password")
 	user.Email = r.FormValue("email")
 
 	token, err := h.repo.GenerateJWT(user.Password, user.Email)
 	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
 		h.logg.Errorln(err)
-		return
-	}
-	if token == "" {
-		http.Error(w, "token is empty", http.StatusUnauthorized)
-		h.logg.Errorln("token is empty")
 		return
 	}
 
 	setCookie(w, "jwt", token)
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	http.Redirect(w, r, "/listCV", http.StatusSeeOther)
 }
 
 func (h *Handlers) MakeCV(w http.ResponseWriter, r *http.Request) {
-	cv := h.srv.CV
-	err := r.ParseForm()
+	tmpl, err := template.ParseFiles("./web/makecv.html")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	err = tmpl.Execute(w, PageData{})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	cv := h.srv.CV
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.logg.Errorln(err)
+		return
+	}
 	salary := r.FormValue("salary")
+	age := r.FormValue("age")
+	cv.Profession = r.FormValue("profession")
+	cv.Age, _ = strconv.Atoi(age)
 	cv.Name = r.FormValue("name")
 	cv.Surname = r.FormValue("surname")
 	cv.PhoneNumber = r.FormValue("phone")
@@ -106,16 +140,57 @@ func (h *Handlers) MakeCV(w http.ResponseWriter, r *http.Request) {
 	cv.Education = r.FormValue("education")
 	cv.Skills = r.Form["skills"]
 
-	id, err := h.repo.AddNewCV(cv.Salary, cv.Name, cv.Surname, cv.EmailCV, cv.LivingCity, cv.PhoneNumber, cv.Education)
+	id, err := h.repo.AddNewCV(cv.Age, cv.Salary, cv.Profession, cv.Name, cv.Surname, cv.EmailCV, cv.LivingCity, cv.PhoneNumber, cv.Education, cv.Skills...)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.logg.Errorln(err)
+		return
+	}
+	h.data = append(h.data, PageUsersCV{ID: id, Profession: cv.Profession})
+}
+
+func (h *Handlers) ListCV(w http.ResponseWriter, r *http.Request) {
+	tmpl, err := template.ParseFiles("./web/cv-list.html")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	errTx := h.repo.InsertSkills(id, cv.Skills...)
-	if errTx != nil {
-		http.Error(w, errTx.Error(), http.StatusInternalServerError)
+	err = tmpl.Execute(w, h.data)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+}
+
+func (h *Handlers) UserCV(w http.ResponseWriter, r *http.Request) {
+	idStr := r.URL.Query().Get("id")
+	if idStr == "" {
+		http.Error(w, "ID not provided", http.StatusBadRequest)
+		h.logg.Errorln("ID not provided")
+		return
+	}
+
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		h.logg.Errorln(err)
+		return
+	}
+
+	dataCV, err := h.repo.GetDataCV(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.logg.Errorln(err)
+		return
+	}
+	tmpl, err := template.ParseFiles("./web/cv.html")
+	tmpl.Execute(w, dataCV)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.logg.Errorln(err)
+		return
+	}
+	http.Redirect(w, r, "/profile", http.StatusSeeOther)
 }
 
 func (h *Handlers) LogOut(w http.ResponseWriter, r *http.Request) {

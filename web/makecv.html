@@ -4,22 +4,50 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CV Maker</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/cv.css">
 </head>
 <body>
     <div class="content"> 
-    <form method="POST" method="GET" action="/makeCV">
-        <input type="text" id="username" name="name" placeholder="Enter name" required>
-        <input type="text" id="surname" name="surname" placeholder="Enter surname" required>
-        <input type="text" id="phone" name="phone" placeholder="Enter phone" required>
-        <input type="text" id="salary" name="salary" placeholder="Enter salary" required>
-        <input type="text" id="city" name="city" placeholder="Enter city" required>
-        <input type="text" id="email" name="email" placeholder="Enter email" required>
-        <input type="text" id="education" name="education" placeholder="Enter education" required>
-        <input type="text" id="skills" name="skills" placeholder="Enter your skills" required>
-        <button type="submit" class="btn">Make you CV</button>
-        <button type="submit" class="btn">DOWNLOAD</button>
-    </form>
+        <h1>Create Your CV</h1>
+        <form method="POST" action="/makeCV"> <!-- Оставляем только один метод POST -->
+            <div class="input-group">
+                <label for="username">Name</label>
+                <input type="text" id="username" name="name" placeholder="Enter name" required>
+            </div>
+            <div class="input-group">
+                <label for="surname">Surname</label>
+                <input type="text" id="surname" name="surname" placeholder="Enter surname" required>
+            </div>
+            <div class="input-group">
+                <label for="phone">Phone</label>
+                <input type="text" id="phone" name="phone" placeholder="Enter phone" required>
+            </div>
+            <div class="input-group">
+                <label for="salary">Salary</label>
+                <input type="text" id="salary" name="salary" placeholder="Enter salary" required>
+            </div>
+            <div class="input-group">
+                <label for="city">City</label>
+                <input type="text" id="city" name="city" placeholder="Enter city" required>
+            </div>
+            <div class="input-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" placeholder="Enter email" required>
+            </div>
+            <div class="input-group">
+                <label for="education">Education</label>
+                <input type="text" id="education" name="education" placeholder="Enter education" required>
+            </div>
+            <div class="input-group">
+                <label for="skills">Skills</label>
+                <input type="text" id="skills" name="skills" placeholder="Enter your skills" required>
+            </div>
+            <button type="submit" class="btn">Create it</button> <!-- Кнопка отправки формы -->
+        </form>
+        <br>
+        <form action="/listCV" method="GET">
+            <button type="submit" class="btn">View CV List</button> <!-- Отдельная кнопка для перехода к списку резюме -->
+        </form>
     </div>    
 </body>
 </html>
