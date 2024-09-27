@@ -1,2 +1,2 @@
 # CVmaker
-The microservice CV maker for Head-Hunters
+The microservice CV maker
