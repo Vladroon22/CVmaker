@@ -5,10 +5,100 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CV List</title>
     <link rel="stylesheet" href="/static/cv-style.css"> 
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+    
+        .content {
+            display: none;
+            max-width: 600px;
+            margin: auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .lbl {
+            width: 100%;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .lbl:hover {
+            background-color: #45a049;
+        }
+
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .btn:hover {
+            background-color: #45a049;
+        }
+
+        #toggleCreateCV:checked ~ .content {
+            display: block;
+        }
+
+        #toggleCreateCV:checked ~ .container {
+            display: none;
+        }
+
+        #toggleCreateCV {
+            display: none;
+        }
+    </style>
 </head>
 <body>
+    
+    <input type="checkbox" id="toggleCreateCV">
     <div class="container">
         <h1>List of CVs</h1>
+        <label for="toggleCreateCV" class="lbl">Create New CV</label>
         <table>
             <thead>
                 <tr>
@@ -19,13 +109,74 @@
             <tbody>
                 {{range .}}
                 <tr>
-                    <td><form action="/profile" method="GET"><button type="submit" class="btn">{{.ID}}</button></form></td> 
-                    <td><form action="/profile" method="GET"><button type="submit" class="btn">{{.Profession}}</button></form></td> 
+                    <td>
+                        <form action="/user/profile" method="GET">
+                            <input type="hidden" name="id" value="{{.ID}}">
+                            <button type="submit">{{.ID}}</button>
+                        </form>
+                    </td> 
+                    <td>
+                        <form action="/user/profile" method="GET">
+                            <input type="hidden" name="id" value="{{.ID}}">
+                            <button type="submit">{{.Profession}}</button>
+                        </form>
+                    </td> 
                 </tr>
                 {{end}}
             </tbody>
         </table>
-        <form action="/makeCV" method="GET"><button type="submit" class="btn">Create New CV</button></form>
     </div>
+
+    <div class="content"> 
+        <h1>Create Your CV</h1>
+        <form method="POST" action="/user/makeCV">
+            <div class="input-group">
+                <label for="profession">Profession</label>
+                <input type="text" id="profession" name="profession" placeholder="Enter profession" required>
+            </div>
+            <div class="input-group">
+                <label for="username">Name</label>
+                <input type="text" id="username" name="name" placeholder="Enter name" required>
+            </div>
+            <div class="input-group">
+                <label for="surname">Surname</label>
+                <input type="text" id="surname" name="surname" placeholder="Enter surname" required>
+            </div>
+            <div class="input-group">
+                <label for="phone">Phone</label>
+                <input type="text" id="phone" name="phone" placeholder="Enter phone" required>
+            </div>
+            <div class="input-group">
+                <label for="phone">Age</label>
+                <input type="text" id="age" name="age" placeholder="Enter age" required>
+            </div>
+            <div class="input-group">
+                <label for="salary">Salary</label>
+                <input type="text" id="salary" name="salary" placeholder="Enter salary" required>
+            </div>
+            <div class="input-group">
+                <label for="city">City</label>
+                <input type="text" id="city" name="city" placeholder="Enter city" required>
+            </div>
+            <div class="input-group">
+                <label for="emailcv">Email</label>
+                <input type="text" id="emailcv" name="emailcv" placeholder="Enter emailcv" required>
+            </div>
+            <div class="input-group">
+                <label for="education">Education</label>
+                <input type="text" id="education" name="education" placeholder="Enter education" required>
+            </div>
+            <div class="input-group">
+                <label for="skills">Skills</label>
+                <input type="text" id="skills" name="skills" placeholder="Enter your skills" required>
+            </div>
+            <button type="submit" class="btn">Create it</button> 
+        </form>
+        <br>
+        <form action="/user/listCV" method="GET">
+            <button type="submit" class="btn">View CV List</button>
+        </form>
+    </div>
+
 </body>
 </html>

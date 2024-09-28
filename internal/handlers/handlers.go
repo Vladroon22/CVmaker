@@ -13,12 +13,15 @@ import (
 	"github.com/Vladroon22/CVmaker/internal/service"
 	golog "github.com/Vladroon22/GoLog"
 	"github.com/dgrijalva/jwt-go"
-	"github.com/gorilla/mux"
 )
 
 const (
 	TTL = time.Hour
 )
+
+type PageCV struct {
+	CV *service.CV
+}
 
 type PageUsersCV struct {
 	ID         int
@@ -30,20 +33,20 @@ type PageData struct {
 }
 
 type Handlers struct {
-	R    *mux.Router
 	logg *golog.Logger
 	repo *database.Repo
 	srv  *service.Service
 	data []PageUsersCV // need to store in cash (redis)
+	cvs  []service.CV  // need to store in cash (redis)
 }
 
-func NewHandler(r *database.Repo, h *mux.Router, l *golog.Logger, s *service.Service) *Handlers {
+func NewHandler(l *golog.Logger, r *database.Repo, s *service.Service) *Handlers {
 	return &Handlers{
-		repo: r,
-		R:    h,
 		logg: l,
+		repo: r,
 		srv:  s,
-		data: make([]PageUsersCV, 10),
+		data: make([]PageUsersCV, 0),
+		cvs:  make([]service.CV, 0),
 	}
 }
 
@@ -58,13 +61,6 @@ func (h *Handlers) HomePage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
-	var err error
-	tmpl, err := template.ParseFiles("./web/sign-up.html")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		h.logg.Errorln(err)
@@ -75,14 +71,9 @@ func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
 	user.Password = r.FormValue("password")
 	user.Email = r.FormValue("email")
 
-	if err = h.repo.CreateUser(user.Name, user.Password, user.Email); err != nil {
+	if err := h.repo.CreateUser(&user); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		h.logg.Errorln(err)
-		return
-	}
-	err = tmpl.Execute(w, PageData{Error: err})
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -114,26 +105,16 @@ func (h *Handlers) SignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	setCookie(w, "jwt", token)
-	http.Redirect(w, r, "/listCV", http.StatusSeeOther)
+	http.Redirect(w, r, "/user/listCV", http.StatusSeeOther)
 }
 
 func (h *Handlers) MakeCV(w http.ResponseWriter, r *http.Request) {
-	tmpl, err := template.ParseFiles("./web/makecv.html")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	err = tmpl.Execute(w, PageData{})
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	cv := h.srv.CV
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		h.logg.Errorln(err)
 		return
 	}
+	cv := &h.srv.CV
 	salary := r.FormValue("salary")
 	age := r.FormValue("age")
 	cv.Profession = r.FormValue("profession")
@@ -147,16 +128,35 @@ func (h *Handlers) MakeCV(w http.ResponseWriter, r *http.Request) {
 	cv.Education = r.FormValue("education")
 	cv.Skills = r.Form["skills"]
 
-	id, err := h.repo.AddNewCV(cv.Age, cv.Salary, cv.Profession, cv.Name, cv.Surname, cv.EmailCV, cv.LivingCity, cv.PhoneNumber, cv.Education, cv.Skills...)
+	id, err := h.repo.AddNewCV(cv)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		h.logg.Errorln(err)
 		return
 	}
 	h.data = append(h.data, PageUsersCV{ID: id, Profession: cv.Profession})
+	tmpl, err := template.ParseFiles("./web/cv-list.html")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	err = tmpl.Execute(w, h.data)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func (h *Handlers) ListCV(w http.ResponseWriter, r *http.Request) {
+	dataCV, err := h.repo.CheckDB()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	for _, cv := range dataCV {
+		h.data = append(h.data, PageUsersCV{ID: cv.ID, Profession: cv.Profession})
+		h.cvs = append(h.cvs, *cv)
+	}
 	tmpl, err := template.ParseFiles("./web/cv-list.html")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -183,21 +183,19 @@ func (h *Handlers) UserCV(w http.ResponseWriter, r *http.Request) {
 		h.logg.Errorln(err)
 		return
 	}
-
-	dataCV, err := h.repo.GetDataCV(id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		h.logg.Errorln(err)
-		return
+	searchCV := &service.CV{}
+	for _, cv := range h.cvs {
+		if cv.ID == id {
+			searchCV = &cv
+		}
 	}
 	tmpl, err := template.ParseFiles("./web/cv.html")
-	tmpl.Execute(w, dataCV)
+	tmpl.Execute(w, searchCV)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		h.logg.Errorln(err)
 		return
 	}
-	http.Redirect(w, r, "/profile", http.StatusSeeOther)
 }
 
 func (h *Handlers) LogOut(w http.ResponseWriter, r *http.Request) {
@@ -229,7 +227,7 @@ func clearCookie(w http.ResponseWriter, cookieName string, cookies string) {
 	http.SetCookie(w, cookie)
 }
 
-func AuthMiddleWare(next http.HandlerFunc) http.HandlerFunc {
+func (h *Handlers) AuthMiddleWare(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie("jwt")
 		if err != nil {
@@ -247,7 +245,7 @@ func AuthMiddleWare(next http.HandlerFunc) http.HandlerFunc {
 		}
 		r = r.WithContext(context.WithValue(r.Context(), "id", claims.UserID))
 
-		next(w, r)
+		next.ServeHTTP(w, r)
 	})
 }
 

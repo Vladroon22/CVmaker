@@ -19,7 +19,7 @@ func Hashing(pass string) ([]byte, error) {
 	return bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
 }
 
-func validateEmail(email string) bool {
+func ValidateEmail(email string) bool {
 	emailRegex := regexp.MustCompile("(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+.[a-zA-Z0-9-.]+$)")
 	return emailRegex.MatchString(email)
 }
@@ -32,7 +32,7 @@ func Valid(user *service.UserInput) error {
 		return errors.New("username must be more than 3 and less than 50 symbols")
 	}
 
-	if ok := validateEmail(user.Email); !ok {
+	if ok := ValidateEmail(user.Email); !ok {
 		return errors.New("wrong email input")
 	}
 	return nil

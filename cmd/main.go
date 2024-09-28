@@ -24,28 +24,55 @@ func main() {
 		return
 	}
 
+	router := mux.NewRouter()
 	srv := service.NewService()
-	repo := database.NewRepo(db, cnf, srv)
-	r := handlers.NewHandler(repo, mux.NewRouter(), logger, srv)
+	repo := database.NewRepo(db, srv)
+	h := handlers.NewHandler(logger, repo, srv)
 
-	r.R.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./web"))))
+	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./web"))))
 
-	r.R.HandleFunc("/", r.HomePage).Methods("GET")
-	r.R.HandleFunc("/sign-up", r.Register).Methods("POST")
-	r.R.HandleFunc("/sign-in", handlers.AuthMiddleWare(r.SignIn)).Methods("POST")
-	r.R.HandleFunc("/makeCV", r.MakeCV).Methods("POST")
-	r.R.HandleFunc("/profile", r.UserCV).Methods("GET")
-	r.R.HandleFunc("/listCV", r.ListCV).Methods("GET")
-	r.R.HandleFunc("/logout", r.LogOut).Methods("GET")
+	router.HandleFunc("/", h.HomePage).Methods("GET")
+	router.HandleFunc("/sign-up", h.Register).Methods("POST")
+	router.HandleFunc("/sign-in", h.SignIn).Methods("POST")
 
-	go http.ListenAndServe(cnf.Addr_PORT, r.R)
+	sub := router.PathPrefix("/user/").Subrouter()
+	h.AuthMiddleWare(sub)
+
+	router.HandleFunc("/user/makeCV", h.MakeCV).Methods("PUT", "POST")
+	router.HandleFunc("/user/profile", h.UserCV).Methods("GET")
+	router.HandleFunc("/user/listCV", h.ListCV).Methods("GET")
+	router.HandleFunc("/user/logout", h.LogOut).Methods("GET")
+
+	/*
+			router.AuthEndPoints() // <-- sign-up/sign-in
+
+			usersPoints := router.R.PathPrefix("/users").Subrouter()
+			router.AuthMiddleWare(usersPoints)
+			router.UserEndPoints(usersPoints)
+
+
+
+		s := server.New(cnf, logger)
+		go func() {
+			if err := s.Run(router); err != nil || err == http.ErrServerClosed {
+				logger.Fatalln(err)
+				return
+			}
+		}()
+	*/
 	logger.Infoln("Server is listening --> localhost" + cnf.Addr_PORT)
+	go http.ListenAndServe(cnf.Addr_PORT, router)
 
 	exitSig := make(chan os.Signal, 1)
 	signal.Notify(exitSig, syscall.SIGINT, syscall.SIGTERM)
 	<-exitSig
 
 	go func() {
+		/*	if err := s.Shutdown(context.Background()); err != nil {
+				logger.Fatalln(err)
+				return
+			}
+		*/
 		if err := db.CloseDB(); err != nil {
 			logger.Fatalln(err)
 			return
