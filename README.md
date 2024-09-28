@@ -1,5 +1,4 @@
-# CVmaker
-<h1> The microservice CV maker <h1>
+# The microservice CV maker 
 
 <h2>Configuration</h2>
 
