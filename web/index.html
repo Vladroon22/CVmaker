@@ -73,7 +73,7 @@
             cursor: pointer;
         }
 
-        .lbl {
+        .lblUp {
             width: 100%;
             padding: 10px;
             background-color: #007bff;
@@ -82,11 +82,32 @@
             border: none;
             border-radius: 5px;
             cursor: pointer;
+            margin-left: 283px;
         }
-        .lbl:hover {
+
+        .lblIn {
+            width: 100%;
+            padding: 10px;
+            background-color: #007bff;
+            color: white;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-left: 290px;
+        }
+
+        .lblIn:hover {
             background-color: #0056b3;
         }
 
+        .lblUp:hover {
+            background-color: #0056b3;
+        }
+
+        .h4{
+            margin-top: 10px;
+        }
         .btn:hover {
             background-color: #0056b3;
         }
@@ -126,8 +147,8 @@
                     </div>
                     <button type="submit" class="btn">Sign In</button>
                 </form> 
-                <h4>Don't have an account yet?</h4>
-                <label class="btn" for="toggleSignUp" style="margin-top: 20px;">Sign Up</label>
+                <h4 class="h4">Don't have an account yet?</h4>
+                <label class="lblUp" for="toggleSignUp">Sign Up</label>
             </div>
 
             <div id="signUpForm" class="registration-form">
@@ -147,8 +168,8 @@
                     </div>
                     <button type="submit" class="btn">Sign Up</button>
                 </form>
-                <h4>Already have an account?</h4>
-                <label class="btn" for="toggleSignUp" style="margin-top: 20px;">Sign In</label>
+                <h4 class="h4">Already have an account?</h4>
+                <label class="lblIn" for="toggleSignUp">Sign In</label>
             </div>
         </div>
     </div>
