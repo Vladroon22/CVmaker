@@ -26,7 +26,7 @@ type PageUsersCV struct {
 }
 
 type PageData struct {
-	Error string
+	Error error
 }
 
 type Handlers struct {
@@ -34,7 +34,7 @@ type Handlers struct {
 	logg *golog.Logger
 	repo *database.Repo
 	srv  *service.Service
-	data []PageUsersCV
+	data []PageUsersCV // need to store in cash (redis)
 }
 
 func NewHandler(r *database.Repo, h *mux.Router, l *golog.Logger, s *service.Service) *Handlers {
@@ -58,12 +58,8 @@ func (h *Handlers) HomePage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
+	var err error
 	tmpl, err := template.ParseFiles("./web/sign-up.html")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	err = tmpl.Execute(w, PageData{})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -79,9 +75,14 @@ func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
 	user.Password = r.FormValue("password")
 	user.Email = r.FormValue("email")
 
-	if err := h.repo.CreateUser(user.Name, user.Password, user.Email); err != nil {
+	if err = h.repo.CreateUser(user.Name, user.Password, user.Email); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		h.logg.Errorln(err)
+		return
+	}
+	err = tmpl.Execute(w, PageData{Error: err})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -99,13 +100,19 @@ func (h *Handlers) SignIn(w http.ResponseWriter, r *http.Request) {
 	user.Password = r.FormValue("password")
 	user.Email = r.FormValue("email")
 
-	token, err := h.repo.GenerateJWT(user.Password, user.Email)
+	id, err := h.repo.Login(user.Password, user.Email)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.logg.Errorln(err)
+		return
+	}
+
+	token, err := h.repo.GenerateJWT(id, user.Password, user.Email)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		h.logg.Errorln(err)
 		return
 	}
-
 	setCookie(w, "jwt", token)
 	http.Redirect(w, r, "/listCV", http.StatusSeeOther)
 }
@@ -238,7 +245,7 @@ func AuthMiddleWare(next http.HandlerFunc) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
-		r = r.WithContext(context.WithValue(r.Context(), "id", claims.UserId))
+		r = r.WithContext(context.WithValue(r.Context(), "id", claims.UserID))
 
 		next(w, r)
 	})

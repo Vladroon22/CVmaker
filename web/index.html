@@ -4,29 +4,158 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CV Maker</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            background-color: grey;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .content {
+            width: 100%;
+            max-width: 400px;
+            margin: 20px;
+        }
+
+        .registration-form {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-left: 5px;
+            font-weight: bold;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
+        .input-group input:focus {
+            border-color: #007bff;
+            outline: none;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 10px;
+            background-color: #007bff;
+            color: white;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .lbl {
+            width: 100%;
+            padding: 10px;
+            background-color: #007bff;
+            color: white;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .lbl:hover {
+            background-color: #0056b3;
+        }
+
+        .btn:hover {
+            background-color: #0056b3;
+        }
+
+        .error {
+            background-color: red;
+        }
+
+        #signUpForm {
+            display: none;
+        }
+
+        #toggleSignUp:checked ~ .forms-container #signInForm {
+            display: none;
+        }
+
+        #toggleSignUp:checked ~ .forms-container #signUpForm {
+            display: block;
+        }
+    </style>
 </head>
-<body>
+<body>   
     <div class="content">
-        <div class="registration-form">
-            <h2>Sign-In</h2>
-            <form action="/sign-in" method="GET" method="POST">
-                <div class="input-group">
-                    <label for="email">Email</label>
-                    <input type="text" id="email" name="email" placeholder="Enter email" required>
-                </div>
-                <div class="input-group">
-                    <label for="password">Password</label>
-                    <input type="password" id="password" name="password" placeholder="Enter password" required>
-                </div>
-                <form action="/listCV" method="GET">   
+        <input type="checkbox" id="toggleSignUp" style="display:none;">
+
+        <div class="forms-container">
+            <div id="signInForm" class="registration-form">
+                <h2>Sign-In</h2>
+                <form action="/sign-in" method="POST">
+                    <div class="input-group">
+                        <label for="email">Email</label>
+                        <input type="text" id="email" name="email" placeholder="Enter email" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password" placeholder="Enter password" required>
+                    </div>
                     <button type="submit" class="btn">Sign In</button>
+                </form> 
+                <h4>Don't have an account yet?</h4>
+                <label class="btn" for="toggleSignUp" style="margin-top: 20px;">Sign Up</label>
+            </div>
+
+            <div id="signUpForm" class="registration-form">
+                <h2>Sign-Up</h2>
+                <form action="/sign-up" method="POST">
+                    <div class="input-group">
+                        <label for="username">Username</label>
+                        <input type="text" id="username" name="username" placeholder="Enter username" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" name="email" placeholder="Enter email" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password" placeholder="Enter password" required>
+                    </div>
+                    <button type="submit" class="btn">Sign Up</button>
                 </form>
-            </form>
-            <form action="/sign-up" method="POST" method="GET"> 
-                <button type="submit" class="btn">Sign Up</button> 
-            </form>
+                <h4>Already have an account?</h4>
+                <label class="btn" for="toggleSignUp" style="margin-top: 20px;">Sign In</label>
+            </div>
         </div>
     </div>
+
+    {{if .Error}}
+        <div class ="error">{{.Error}}</div>
+    {{end}}
+    
 </body>
 </html>

@@ -25,14 +25,11 @@ func validateEmail(email string) bool {
 }
 
 func Valid(user *service.UserInput) error {
-	if user.Password == "" {
-		return errors.New("password cant't be blank")
-	} else if len(user.Password) >= 50 {
-		return errors.New("password cant't be more than 50 symbols")
-	} else if user.Name == "" {
-		return errors.New("username cant't be blank")
-	} else if user.Email == "" {
-		return errors.New("email can't be blank")
+	if len(user.Password) <= 7 || len(user.Password) >= 70 {
+		return errors.New("password must be more than 7 and less than 50 symbols")
+	}
+	if len(user.Name) <= 3 || len(user.Password) >= 70 {
+		return errors.New("username must be more than 3 and less than 50 symbols")
 	}
 
 	if ok := validateEmail(user.Email); !ok {

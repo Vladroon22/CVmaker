@@ -15,7 +15,7 @@ var SignKey = os.Getenv("JWT")
 
 type MyClaims struct {
 	jwt.StandardClaims
-	UserId int `json:"id"`
+	UserID int `json:"id"`
 }
 
 type Repo struct {
@@ -32,25 +32,28 @@ func NewRepo(db *DataBase, cnf *config.Config, s *service.Service) *Repo {
 	}
 }
 
-func (rp *Repo) GenerateJWT(pass, email string) (string, error) {
+func (rp *Repo) Login(pass, email string) (int, error) {
 	var id int
 	var hash string
 	query := "SELECT id, hash_password FROM users WHERE email = $1"
 	if err := rp.db.sqlDB.QueryRow(query, email).Scan(&id, &hash); err != nil {
 		if err == sql.ErrNoRows {
-			return "", errors.New("No-such-user")
+			return 0, errors.New("No-such-user")
 		}
-		return "", err
+		return 0, err
 	}
 
 	if err := CheckPassAndHash(hash, pass); err != nil {
 		rp.db.logger.Errorln(err)
-		return "", err
+		return 0, err
 	}
+	return id, nil
+}
 
+func (rp *Repo) GenerateJWT(id int, pass, email string) (string, error) {
 	JWT, err := jwt.NewWithClaims(jwt.SigningMethodHS256, &MyClaims{
 		jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(5 * time.Hour).Unix(), // TTL of token
+			ExpiresAt: time.Now().Add(time.Hour).Unix(), // TTL of token
 			IssuedAt:  time.Now().Unix(),
 		},
 		id,
@@ -66,10 +69,11 @@ func (rp *Repo) CreateUser(name, password, email string) error {
 	user := rp.srv.UserInput
 	user.Name = name
 	user.Email = email
-	user.Password = password
 	if err := Valid(&user); err != nil {
+		rp.db.logger.Errorln(err)
 		return err
 	}
+
 	enc_pass, err := Hashing(password)
 	if err != nil {
 		rp.db.logger.Errorln(err)

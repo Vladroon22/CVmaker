@@ -31,9 +31,9 @@ func main() {
 	r.R.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./web"))))
 
 	r.R.HandleFunc("/", r.HomePage).Methods("GET")
-	r.R.HandleFunc("/sign-up", r.Register).Methods("GET", "POST")
-	r.R.HandleFunc("/sign-in", handlers.AuthMiddleWare(r.SignIn)).Methods("GET", "POST")
-	r.R.HandleFunc("/makeCV", r.MakeCV).Methods("GET", "POST")
+	r.R.HandleFunc("/sign-up", r.Register).Methods("POST")
+	r.R.HandleFunc("/sign-in", handlers.AuthMiddleWare(r.SignIn)).Methods("POST")
+	r.R.HandleFunc("/makeCV", r.MakeCV).Methods("POST")
 	r.R.HandleFunc("/profile", r.UserCV).Methods("GET")
 	r.R.HandleFunc("/listCV", r.ListCV).Methods("GET")
 	r.R.HandleFunc("/logout", r.LogOut).Methods("GET")
