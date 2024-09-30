@@ -4,6 +4,7 @@
 
 ```
 sudo docker run --name=CV -e POSTGRES_PASSWORD=55555 -p 5433:5432 -d postgres:16.2
+sudo docker run --name=MyRedis -p 6379:6379 -d redis
 ```
 
 <h3>Export env variables</h3>

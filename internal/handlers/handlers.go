@@ -24,7 +24,6 @@ type PageCV struct {
 }
 
 type PageUsersCV struct {
-	ID         int
 	Profession string
 }
 
@@ -36,8 +35,8 @@ type Handlers struct {
 	logg *golog.Logger
 	repo *database.Repo
 	srv  *service.Service
-	data []PageUsersCV // need to store in cash (redis)
-	cvs  []service.CV  // need to store in cash (redis)
+	data []PageUsersCV
+	cvs  []service.CV
 }
 
 func NewHandler(l *golog.Logger, r *database.Repo, s *service.Service) *Handlers {
@@ -128,13 +127,13 @@ func (h *Handlers) MakeCV(w http.ResponseWriter, r *http.Request) {
 	cv.Education = r.FormValue("education")
 	cv.Skills = r.Form["skills"]
 
-	id, err := h.repo.AddNewCV(cv)
+	err := h.repo.AddNewCV(cv)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		h.logg.Errorln(err)
 		return
 	}
-	h.data = append(h.data, PageUsersCV{ID: id, Profession: cv.Profession})
+	h.data = append(h.data, PageUsersCV{Profession: cv.Profession})
 	tmpl, err := template.ParseFiles("./web/cv-list.html")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -145,18 +144,31 @@ func (h *Handlers) MakeCV(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	http.Redirect(w, r, "/user/listCV", http.StatusSeeOther)
 }
 
 func (h *Handlers) ListCV(w http.ResponseWriter, r *http.Request) {
-	dataCV, err := h.repo.CheckDB()
+	Profs, err := h.repo.GetProfessionCV()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	for _, cv := range dataCV {
-		h.data = append(h.data, PageUsersCV{ID: cv.ID, Profession: cv.Profession})
-		h.cvs = append(h.cvs, *cv)
+
+	professions := make(map[string]bool)
+	for _, pr := range Profs {
+		if !professions[pr] {
+			continue
+		}
+		professions[pr] = true
+		cv, err := h.repo.GetDataCV(pr)
+		if err != nil {
+			h.logg.Errorln("Error fetching CV for profession: ", pr, err)
+			continue
+		}
+		h.data = append(h.data, PageUsersCV{Profession: pr})
+		h.cvs = append(h.cvs, cv)
 	}
+
 	tmpl, err := template.ParseFiles("./web/cv-list.html")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -170,22 +182,16 @@ func (h *Handlers) ListCV(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) UserCV(w http.ResponseWriter, r *http.Request) {
-	idStr := r.URL.Query().Get("id")
-	if idStr == "" {
-		http.Error(w, "ID not provided", http.StatusBadRequest)
-		h.logg.Errorln("ID not provided")
+	prof := r.URL.Query().Get("profession")
+	if prof == "" {
+		http.Error(w, "Profession not provided", http.StatusBadRequest)
+		h.logg.Errorln("Profession not provided")
 		return
 	}
 
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		h.logg.Errorln(err)
-		return
-	}
-	searchCV := &service.CV{}
+	searchCV := &h.srv.CV
 	for _, cv := range h.cvs {
-		if cv.ID == id {
+		if cv.Profession == prof {
 			searchCV = &cv
 		}
 	}

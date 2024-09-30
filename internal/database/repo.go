@@ -2,18 +2,19 @@ package database
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"os"
 	"time"
 
 	"github.com/Vladroon22/CVmaker/internal/service"
 	"github.com/dgrijalva/jwt-go"
-	"github.com/lib/pq"
 )
 
 type Repo struct {
 	db  *DataBase
 	srv *service.Service
+	red *Redis
 }
 
 var SignKey = os.Getenv("JWT")
@@ -23,10 +24,11 @@ type MyClaims struct {
 	UserID int `json:"id"`
 }
 
-func NewRepo(db *DataBase, s *service.Service) *Repo {
+func NewRepo(db *DataBase, s *service.Service, r *Redis) *Repo {
 	return &Repo{
 		db:  db,
 		srv: s,
+		red: r,
 	}
 }
 
@@ -83,103 +85,49 @@ func (rp *Repo) CreateUser(user *service.UserInput) error {
 	return nil
 }
 
-func (rp *Repo) AddNewCV(cv *service.CV) (int, error) {
-	var id int
+func (rp *Repo) AddNewCV(cv *service.CV) error {
+	jsonData, err := json.Marshal(cv)
+	if err != nil {
+		return err
+	}
+	rp.db.logger.Infoln(string(jsonData))
+	if err := rp.red.SetData(cv.Profession, string(jsonData)); err != nil {
+		return err
+	}
+	rp.red.Make("lpush", "jobs", cv.Profession)
+	rp.db.logger.Infoln("CV successfully added")
+	return nil
+}
 
-	query := "INSERT INTO CVs (profession, name, age, surname, email_cv, living_city, salary, phone_number, education, skills) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
-	if _, err := rp.db.sqlDB.Exec(query, cv.Profession, cv.Name, cv.Age, cv.Surname, cv.EmailCV, cv.LivingCity, cv.Salary, cv.PhoneNumber, cv.Education, pq.Array(cv.Skills)); err != nil {
+func (rp *Repo) GetProfessionCV() ([]string, error) {
+	prof := []string{}
+
+	data, err := rp.red.Iterate()
+	rp.db.logger.Infoln(data)
+	if err != nil {
 		rp.db.logger.Errorln(err)
-		return 0, err
+		return nil, err
 	}
 
-	rp.db.logger.Infoln("New CV successfully added")
-	return id, nil
+	for _, item := range data {
+		prof = append(prof, item)
+		rp.db.logger.Infoln("Item: ", item)
+	}
+
+	rp.db.logger.Infoln("Profession iterated")
+	return prof, nil
 }
 
-func (rp *Repo) GetDataCV(id int) (*service.CV, error) {
+func (rp *Repo) GetDataCV(item string) (service.CV, error) {
 	cv := service.CV{}
-	query := "SELECT id profession, name, age surname, email_cv, living_city, salary, phone_number, education FROM CVs WHERE id = $1"
-	var skills []string
+	data := rp.red.GetData(item)
+	rp.db.logger.Infoln(data)
 
-	err := rp.db.sqlDB.QueryRow(query, id).Scan(&cv.ID, &cv.Name, &cv.Age, &cv.Surname, &cv.EmailCV, &cv.LivingCity, &cv.Profession, &cv.Salary, &cv.PhoneNumber, &cv.Education, pq.Array(&skills))
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, err
-		}
-		return nil, err
+	if err := json.Unmarshal([]byte(data), &cv); err != nil {
+		rp.db.logger.Errorln(err)
+		return service.CV{}, err
 	}
 
-	cv.Skills = skills
-
-	return &cv, nil
-}
-
-func (rp *Repo) handlerRows() (bool, error) {
-	var count int
-	countQuery := "SELECT COUNT(*) FROM CVs"
-	err := rp.db.sqlDB.QueryRow(countQuery).Scan(&count)
-	if err != nil {
-		return false, err
-	}
-	var lastID int
-	query := "SELECT id FROM CVs ORDER BY id DESC LIMIT 1"
-	err = rp.db.sqlDB.QueryRow(query).Scan(&lastID)
-	if err != nil {
-		return false, err
-	}
-	if count == lastID {
-		return false, nil
-	}
-	return true, nil
-}
-
-func (rp *Repo) CheckDB() ([]*service.CV, error) {
-	ok, err := rp.handlerRows()
-	if err != nil {
-		return nil, err
-	}
-	if !ok {
-		return nil, nil
-	}
-
-	var cvs []*service.CV
-	query := "SELECT id, name, age, surname, email_cv, living_city, profession, salary, phone_number, education, skills FROM CVs"
-
-	rows, err := rp.db.sqlDB.Query(query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		cv := service.CV{}
-		var skills []string
-
-		err := rows.Scan(
-			&cv.ID,
-			&cv.Name,
-			&cv.Age,
-			&cv.Surname,
-			&cv.EmailCV,
-			&cv.LivingCity,
-			&cv.Profession,
-			&cv.Salary,
-			&cv.PhoneNumber,
-			&cv.Education,
-			pq.Array(&skills),
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		cv.Skills = skills
-
-		cvs = append(cvs, &cv)
-	}
-
-	if err = rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return cvs, nil
+	rp.db.logger.Infoln("Get the item")
+	return cv, nil
 }

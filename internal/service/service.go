@@ -7,7 +7,6 @@ type UserInput struct {
 }
 
 type CV struct {
-	ID          int      `json:"cv_id"`
 	Name        string   `json:"name"`
 	Age         int      `json:"age"`
 	Profession  string   `json:"profession"`
@@ -27,19 +26,9 @@ type Utils interface {
 	Valid(*UserInput) error
 }
 
-type Tx interface {
-	GetDataCV(id int) (*CV, error)
-	AddNewCV(*CV) (int, error)
-	CreateUser(*UserInput) error
-	GenerateJWT(int, string, string) (string, error)
-	Login(string, string) (int, error)
-}
-
 type Service struct {
 	CV
 	UserInput
-	Tx
-	Utils
 }
 
 func NewService() *Service {

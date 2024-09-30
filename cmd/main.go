@@ -24,9 +24,11 @@ func main() {
 		return
 	}
 
+	redis := database.NewRedis(logger)
+
 	router := mux.NewRouter()
 	srv := service.NewService()
-	repo := database.NewRepo(db, srv)
+	repo := database.NewRepo(db, srv, redis)
 	h := handlers.NewHandler(logger, repo, srv)
 
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./web"))))
@@ -43,23 +45,6 @@ func main() {
 	router.HandleFunc("/user/listCV", h.ListCV).Methods("GET")
 	router.HandleFunc("/user/logout", h.LogOut).Methods("GET")
 
-	/*
-			router.AuthEndPoints() // <-- sign-up/sign-in
-
-			usersPoints := router.R.PathPrefix("/users").Subrouter()
-			router.AuthMiddleWare(usersPoints)
-			router.UserEndPoints(usersPoints)
-
-
-
-		s := server.New(cnf, logger)
-		go func() {
-			if err := s.Run(router); err != nil || err == http.ErrServerClosed {
-				logger.Fatalln(err)
-				return
-			}
-		}()
-	*/
 	logger.Infoln("Server is listening --> localhost" + cnf.Addr_PORT)
 	go http.ListenAndServe(cnf.Addr_PORT, router)
 
@@ -68,11 +53,6 @@ func main() {
 	<-exitSig
 
 	go func() {
-		/*	if err := s.Shutdown(context.Background()); err != nil {
-				logger.Fatalln(err)
-				return
-			}
-		*/
 		if err := db.CloseDB(); err != nil {
 			logger.Fatalln(err)
 			return

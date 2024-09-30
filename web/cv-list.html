@@ -102,7 +102,6 @@
         <table>
             <thead>
                 <tr>
-                    <th>ID</th> 
                     <th>Profession</th> 
                 </tr>
             </thead>
@@ -111,13 +110,7 @@
                 <tr>
                     <td>
                         <form action="/user/profile" method="GET">
-                            <input type="hidden" name="id" value="{{.ID}}">
-                            <button type="submit">{{.ID}}</button>
-                        </form>
-                    </td> 
-                    <td>
-                        <form action="/user/profile" method="GET">
-                            <input type="hidden" name="id" value="{{.ID}}">
+                            <input type="hidden" name="profession" value="{{.Profession}}">
                             <button type="submit">{{.Profession}}</button>
                         </form>
                     </td> 
@@ -129,7 +122,7 @@
 
     <div class="content"> 
         <h1>Create Your CV</h1>
-        <form method="POST" action="/user/makeCV">
+        <form method="POST" method="PUT" action="/user/makeCV">
             <div class="input-group">
                 <label for="profession">Profession</label>
                 <input type="text" id="profession" name="profession" placeholder="Enter profession" required>
