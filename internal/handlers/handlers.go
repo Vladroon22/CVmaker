@@ -134,17 +134,8 @@ func (h *Handlers) MakeCV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.data = append(h.data, PageUsersCV{Profession: cv.Profession})
-	tmpl, err := template.ParseFiles("./web/cv-list.html")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	err = tmpl.Execute(w, h.data)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	http.Redirect(w, r, "/user/listCV", http.StatusSeeOther)
+
+	http.Redirect(w, r, "/user/listCV", http.StatusMovedPermanently)
 }
 
 func (h *Handlers) ListCV(w http.ResponseWriter, r *http.Request) {
