@@ -8,9 +8,8 @@ import (
 )
 
 type Redis struct {
-	rd         *redis.Client
-	logger     *golog.Logger
-	expireTime time.Duration
+	rd     *redis.Client
+	logger *golog.Logger
 }
 
 func NewRedis(lg *golog.Logger) *Redis {
@@ -21,14 +20,13 @@ func NewRedis(lg *golog.Logger) *Redis {
 	})
 
 	return &Redis{
-		rd:         client,
-		logger:     lg,
-		expireTime: time.Hour,
+		rd:     client,
+		logger: lg,
 	}
 }
 
-func (r *Redis) SetData(item string, data interface{}) error {
-	if err := r.rd.Set(item, data, r.expireTime).Err(); err != redis.Nil {
+func (r *Redis) SetData(item string, data interface{}, expTime time.Duration) error {
+	if err := r.rd.Set(item, data, expTime).Err(); err != redis.Nil {
 		r.logger.Errorln(err)
 		return err
 	}

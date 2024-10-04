@@ -29,7 +29,7 @@ func main() {
 	router := mux.NewRouter()
 	srv := service.NewService()
 	repo := database.NewRepo(db, srv, redis)
-	h := handlers.NewHandler(logger, repo, srv)
+	h := handlers.NewHandler(logger, repo, srv, redis)
 
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./web"))))
 

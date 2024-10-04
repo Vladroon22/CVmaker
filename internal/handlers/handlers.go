@@ -32,6 +32,7 @@ type PageData struct {
 }
 
 type Handlers struct {
+	rds  *database.Redis
 	logg *golog.Logger
 	repo *database.Repo
 	srv  *service.Service
@@ -39,11 +40,12 @@ type Handlers struct {
 	cvs  []service.CV
 }
 
-func NewHandler(l *golog.Logger, r *database.Repo, s *service.Service) *Handlers {
+func NewHandler(l *golog.Logger, r *database.Repo, s *service.Service, rd *database.Redis) *Handlers {
 	return &Handlers{
 		logg: l,
 		repo: r,
 		srv:  s,
+		rds:  rd,
 		data: make([]PageUsersCV, 0),
 		cvs:  make([]service.CV, 0),
 	}
@@ -103,7 +105,12 @@ func (h *Handlers) SignIn(w http.ResponseWriter, r *http.Request) {
 		h.logg.Errorln(err)
 		return
 	}
-	setCookie(w, "jwt", token)
+
+	if err := h.rds.SetData("JWT", token, time.Hour); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	http.Redirect(w, r, "/user/listCV", http.StatusSeeOther)
 }
 
@@ -196,46 +203,18 @@ func (h *Handlers) UserCV(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) LogOut(w http.ResponseWriter, r *http.Request) {
-	clearCookie(w, "jwt", "")
+	h.rds.Make("del", "JWT")
 	http.Redirect(w, r, "/", http.StatusSeeOther)
-}
-
-func setCookie(w http.ResponseWriter, cookieName string, cookies string) {
-	cookie := &http.Cookie{
-		Name:     cookieName,
-		Value:    cookies,
-		Path:     "/",
-		Secure:   false,
-		HttpOnly: true,
-		Expires:  time.Now().Add(TTL),
-	}
-	http.SetCookie(w, cookie)
-}
-
-func clearCookie(w http.ResponseWriter, cookieName string, cookies string) {
-	cookie := &http.Cookie{
-		Name:     cookieName,
-		Value:    cookies,
-		Path:     "/",
-		Expires:  time.Unix(0, 0),
-		Secure:   false,
-		HttpOnly: true,
-	}
-	http.SetCookie(w, cookie)
 }
 
 func (h *Handlers) AuthMiddleWare(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie("jwt")
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusUnauthorized)
-			return
-		}
-		if cookie.Value == "" {
+		token := h.rds.GetData("JWT")
+		if token == "" {
 			http.Error(w, "Cookie is empty", http.StatusUnauthorized)
 			return
 		}
-		claims, err := validateToken(cookie.Value)
+		claims, err := validateToken(token)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return

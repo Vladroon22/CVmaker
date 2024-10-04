@@ -91,7 +91,7 @@ func (rp *Repo) AddNewCV(cv *service.CV) error {
 		return err
 	}
 	rp.db.logger.Infoln(string(jsonData))
-	if err := rp.red.SetData(cv.Profession, string(jsonData)); err != nil {
+	if err := rp.red.SetData(cv.Profession, string(jsonData), time.Minute*30); err != nil {
 		return err
 	}
 	rp.red.Make("lpush", "jobs", cv.Profession)
