@@ -17,7 +17,7 @@ type Repo struct {
 	red *Redis
 }
 
-var SignKey = os.Getenv("JWT")
+var SignKey = []byte(os.Getenv("KEY"))
 
 type MyClaims struct {
 	jwt.StandardClaims
@@ -50,19 +50,41 @@ func (rp *Repo) Login(pass, email string) (int, error) {
 	return id, nil
 }
 
-func (db *Repo) GenerateJWT(id int, pass, email string) (string, error) {
+func (rp *Repo) GenerateJWT(id int, pass, email string) (string, error) {
 	JWT, err := jwt.NewWithClaims(jwt.SigningMethodHS256, &MyClaims{
 		jwt.StandardClaims{
 			ExpiresAt: time.Now().Add(time.Hour).Unix(), // TTL of token
 			IssuedAt:  time.Now().Unix(),
 		},
 		id,
-	}).SignedString([]byte(SignKey))
+	}).SignedString(SignKey)
 	if err != nil {
 		return "", err
 	}
 
 	return JWT, nil
+}
+
+func ValidateToken(tokenStr string) (*MyClaims, error) {
+	token, err := jwt.ParseWithClaims(tokenStr, &MyClaims{}, func(token *jwt.Token) (interface{}, error) {
+		return SignKey, nil
+	})
+	if err != nil {
+		if err == jwt.ErrSignatureInvalid {
+			return nil, errors.New(err.Error())
+		}
+		return nil, errors.New(err.Error())
+	}
+
+	claims, ok := token.Claims.(*MyClaims)
+	if !token.Valid {
+		return nil, errors.New("Token-is-invalid")
+	}
+	if !ok {
+		return nil, errors.New("Unauthorized")
+	}
+
+	return claims, nil
 }
 
 func (rp *Repo) CreateUser(user *service.UserInput) error {
@@ -120,7 +142,10 @@ func (rp *Repo) GetProfessionCV() ([]string, error) {
 
 func (rp *Repo) GetDataCV(item string) (service.CV, error) {
 	cv := service.CV{}
-	data := rp.red.GetData(item)
+	data, err := rp.red.GetData(item)
+	if err != nil {
+		return service.CV{}, err
+	}
 	rp.db.logger.Infoln(data)
 
 	if err := json.Unmarshal([]byte(data), &cv); err != nil {

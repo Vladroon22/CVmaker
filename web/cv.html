@@ -5,6 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="/static/cv-style.css">
     <title>CV Maker</title>
+    <style>
+
+        .ex {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #f5f5f5; 
+        }
+
+        #logoutButton {
+            background-color: #ff4b5c; 
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        #logoutButton:hover {
+            background-color: #e63946; 
+        }
+
+        #logoutButton:active {
+            background-color: #d62828; 
+        }
+
+    </style>
 </head>
 <body>
     <h1>{{.Name}} {{.Surname}}'s CV</h1>
@@ -24,7 +53,7 @@
         {{end}}
     </ul>
 
-    <form class="ex" action="/" method="get">
+    <form class="ex" action="/logout" method="get">
         <div class="exit">
             <button id="logoutButton">Log Out</button>
         </div>

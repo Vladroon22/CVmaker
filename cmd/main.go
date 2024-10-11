@@ -31,19 +31,19 @@ func main() {
 	repo := database.NewRepo(db, srv, redis)
 	h := handlers.NewHandler(logger, repo, srv, redis)
 
-	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./web"))))
+	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./web/"))))
 
 	router.HandleFunc("/", h.HomePage).Methods("GET")
 	router.HandleFunc("/sign-up", h.Register).Methods("POST")
 	router.HandleFunc("/sign-in", h.SignIn).Methods("POST")
+	router.HandleFunc("/logout", h.LogOut).Methods("GET")
 
 	sub := router.PathPrefix("/user/").Subrouter()
-	h.AuthMiddleWare(sub)
+	sub.Use(h.AuthMiddleWare)
 
-	router.HandleFunc("/user/makeCV", h.MakeCV).Methods("PUT", "POST")
-	router.HandleFunc("/user/profile", h.UserCV).Methods("GET")
-	router.HandleFunc("/user/listCV", h.ListCV).Methods("GET")
-	router.HandleFunc("/user/logout", h.LogOut).Methods("GET")
+	sub.HandleFunc("/makeCV", h.MakeCV).Methods("PUT", "POST")
+	sub.HandleFunc("/profile", h.UserCV).Methods("GET")
+	sub.HandleFunc("/listCV", h.ListCV).Methods("GET")
 
 	logger.Infoln("Server is listening --> localhost" + cnf.Addr_PORT)
 	go http.ListenAndServe(cnf.Addr_PORT, router)

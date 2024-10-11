@@ -2,8 +2,6 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"net/http"
 	"strconv"
 	"text/template"
@@ -12,7 +10,6 @@ import (
 	"github.com/Vladroon22/CVmaker/internal/database"
 	"github.com/Vladroon22/CVmaker/internal/service"
 	golog "github.com/Vladroon22/GoLog"
-	"github.com/dgrijalva/jwt-go"
 )
 
 const (
@@ -32,7 +29,7 @@ type PageData struct {
 }
 
 type Handlers struct {
-	rds  *database.Redis
+	red  *database.Redis
 	logg *golog.Logger
 	repo *database.Repo
 	srv  *service.Service
@@ -45,7 +42,7 @@ func NewHandler(l *golog.Logger, r *database.Repo, s *service.Service, rd *datab
 		logg: l,
 		repo: r,
 		srv:  s,
-		rds:  rd,
+		red:  rd,
 		data: make([]PageUsersCV, 0),
 		cvs:  make([]service.CV, 0),
 	}
@@ -106,7 +103,7 @@ func (h *Handlers) SignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.rds.SetData("JWT", token, time.Hour); err != nil {
+	if err := h.red.SetData("JWT", token, time.Hour); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -149,6 +146,7 @@ func (h *Handlers) ListCV(w http.ResponseWriter, r *http.Request) {
 	Profs, err := h.repo.GetProfessionCV()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.logg.Errorln(err)
 		return
 	}
 
@@ -170,11 +168,13 @@ func (h *Handlers) ListCV(w http.ResponseWriter, r *http.Request) {
 	tmpl, err := template.ParseFiles("./web/cv-list.html")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.logg.Errorln(err)
 		return
 	}
 	err = tmpl.Execute(w, h.data)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.logg.Errorln(err)
 		return
 	}
 }
@@ -203,50 +203,26 @@ func (h *Handlers) UserCV(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) LogOut(w http.ResponseWriter, r *http.Request) {
-	h.rds.Make("del", "JWT")
+	h.red.Make("del", "JWT")
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func (h *Handlers) AuthMiddleWare(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := h.rds.GetData("JWT")
-		if token == "" {
-			http.Error(w, "Cookie is empty", http.StatusUnauthorized)
+		token, err := h.red.GetData("JWT")
+		if err != nil || token == "" {
+			http.Error(w, "JWT not exists", http.StatusUnauthorized)
+			h.logg.Errorln("JWT not exists")
 			return
 		}
-		claims, err := validateToken(token)
+		claims, err := database.ValidateToken(token)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
+			h.logg.Errorln(err)
 			return
 		}
 		r = r.WithContext(context.WithValue(r.Context(), "id", claims.UserID))
 
 		next.ServeHTTP(w, r)
 	})
-}
-
-func validateToken(tokenStr string) (*database.MyClaims, error) {
-	token, err := jwt.ParseWithClaims(tokenStr, &database.MyClaims{}, func(token *jwt.Token) (interface{}, error) {
-		return database.SignKey, nil
-	})
-	if err != nil {
-		if err == jwt.ErrSignatureInvalid {
-			return nil, errors.New("Unauthorized")
-		}
-		return nil, errors.New("Bad-Request")
-	}
-
-	claims, ok := token.Claims.(*database.MyClaims)
-	if !ok || !token.Valid {
-		return nil, errors.New("Unauthorized")
-	}
-
-	return claims, nil
-}
-
-func WriteJSON(w http.ResponseWriter, status int, a interface{}) error {
-	w.Header().Add("Content-Type", "application/json")
-	w.WriteHeader(status)
-
-	return json.NewEncoder(w).Encode(a)
 }

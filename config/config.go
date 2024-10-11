@@ -12,7 +12,7 @@ func CreateConfig() *Config {
 	return &Config{
 		Addr_PORT: getEnv("addr_port", ":3000"),
 		DB:        getEnv("DB", ""),
-		JWT:       getEnv("JWT", ""),
+		JWT:       getEnv("KEY", ""),
 	}
 }
 

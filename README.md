@@ -11,7 +11,7 @@ sudo docker run --name=MyRedis -p 6379:6379 -d redis
 
 ```
 export DB="postgres:55555@localhost:5433/postgres?sslmode=disable" 
-export JWT="imagine your own secret key"
+export KEY="imagine your own secret key"
 ```
 
 <h2>How to run</h2>
