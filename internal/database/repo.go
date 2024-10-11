@@ -17,6 +17,11 @@ type Repo struct {
 	red *Redis
 }
 
+const (
+	TTLofJWT = time.Hour * 24
+	TTLofCV  = time.Hour * 24 * 7
+)
+
 var SignKey = []byte(os.Getenv("KEY"))
 
 type MyClaims struct {
@@ -53,7 +58,7 @@ func (rp *Repo) Login(pass, email string) (int, error) {
 func (rp *Repo) GenerateJWT(id int, pass, email string) (string, error) {
 	JWT, err := jwt.NewWithClaims(jwt.SigningMethodHS256, &MyClaims{
 		jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(time.Hour).Unix(), // TTL of token
+			ExpiresAt: time.Now().Add(TTLofJWT).Unix(), // TTL of token
 			IssuedAt:  time.Now().Unix(),
 		},
 		id,
@@ -113,7 +118,7 @@ func (rp *Repo) AddNewCV(cv *service.CV) error {
 		return err
 	}
 	rp.db.logger.Infoln(string(jsonData))
-	if err := rp.red.SetData(cv.Profession, string(jsonData), time.Minute*30); err != nil {
+	if err := rp.red.SetData(cv.Profession, string(jsonData), TTLofCV); err != nil {
 		return err
 	}
 	rp.red.Make("lpush", "jobs", cv.Profession)

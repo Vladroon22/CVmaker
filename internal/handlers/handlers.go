@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+	"strings"
 	"text/template"
 	"time"
 
@@ -38,6 +39,7 @@ type Handlers struct {
 }
 
 func NewHandler(l *golog.Logger, r *database.Repo, s *service.Service, rd *database.Redis) *Handlers {
+
 	return &Handlers{
 		logg: l,
 		repo: r,
@@ -150,15 +152,14 @@ func (h *Handlers) ListCV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	professions := make(map[string]bool)
 	for _, pr := range Profs {
-		if !professions[pr] {
-			continue
+		if len(Profs) == len(h.data) {
+			break
 		}
-		professions[pr] = true
 		cv, err := h.repo.GetDataCV(pr)
 		if err != nil {
-			h.logg.Errorln("Error fetching CV for profession: ", pr, err)
+			h.logg.Errorln("Error fetching CV for profession: ", err)
+			h.logg.Errorln(pr)
 			continue
 		}
 		h.data = append(h.data, PageUsersCV{Profession: pr})
@@ -191,8 +192,14 @@ func (h *Handlers) UserCV(w http.ResponseWriter, r *http.Request) {
 	for _, cv := range h.cvs {
 		if cv.Profession == prof {
 			searchCV = &cv
+			break
 		}
 	}
+	newSlice := []string{}
+	for _, sk := range searchCV.Skills {
+		newSlice = append(newSlice, strings.Fields(sk)...)
+	}
+	searchCV.Skills = newSlice
 	tmpl, err := template.ParseFiles("./web/cv.html")
 	tmpl.Execute(w, searchCV)
 	if err != nil {
