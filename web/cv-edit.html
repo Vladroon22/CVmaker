@@ -134,39 +134,9 @@
     </style>
 </head>
 <body>
-    
-    <input type="checkbox" id="toggleCreateCV">
-    <div class="container">
-        <h1>List of CVs</h1>
-        <label for="toggleCreateCV" class="lbl">Create New CV</label>
-        <table>
-            <thead>
-                <tr>
-                    <th>Profession</th> 
-                </tr>
-            </thead>
-            <tbody>
-                {{range .}}
-                <tr>
-                    <td>
-                        <form action="/user/profile" method="GET">
-                            <input type="hidden" name="profession" value="{{.Profession}}">
-                            <button type="submit">{{.Profession}}</button>
-                        </form>
-                        <form class="download" action="/user/downloadCV" method="GET">
-                            <input type="hidden" name="profession" value="{{.Profession}}">
-                            <button type="submit">Download PDF</button>
-                        </form>
-                    </td> 
-                </tr>
-                {{end}}
-            </tbody>
-        </table>
-    </div>
-
     <div class="content"> 
         <h1>Create Your CV</h1>
-        <form method="POST" method="PUT" action="/user/makeCV">
+        <form method="PATCH" action="/user/editCV">
             <div class="input-group">
                 <label for="profession">Profession</label>
                 <input type="text" id="profession" name="profession" placeholder="Enter profession" required>
@@ -211,7 +181,7 @@
         </form>
         <br>
         <form action="/user/listCV" method="GET">
-            <button type="submit" class="btn">View CV List</button>
+            <button type="submit" class="btn">Edit it</button>
         </form>
     </div>
     <form class="ex" action="/logout" method="get">

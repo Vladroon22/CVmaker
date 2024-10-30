@@ -44,6 +44,8 @@ func main() {
 	sub.HandleFunc("/makeCV", h.MakeCV).Methods("PUT", "POST")
 	sub.HandleFunc("/profile", h.UserCV).Methods("GET")
 	sub.HandleFunc("/listCV", h.ListCV).Methods("GET")
+	sub.HandleFunc("/editCV", h.EditCV).Methods("GET", "PATCH")
+	sub.HandleFunc("/downloadCV", h.DownLoadPDF).Methods("GET")
 
 	logger.Infoln("Server is listening --> localhost" + cnf.Addr_PORT)
 	go http.ListenAndServe(cnf.Addr_PORT, router)

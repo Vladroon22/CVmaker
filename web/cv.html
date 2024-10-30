@@ -6,7 +6,6 @@
     <link rel="stylesheet" href="/static/cv-style.css">
     <title>CV Maker</title>
     <style>
-
         .ex {
             display: flex;
             justify-content: center;
@@ -32,12 +31,10 @@
         #logoutButton:active {
             background-color: #d62828; 
         }
-
     </style>
 </head>
 <body>
     <h1>{{.Name}} {{.Surname}}'s CV</h1>
-    
     <p><strong>Age:</strong> {{.Age}}</p>
     <p><strong>Profession:</strong> {{.Profession}}</p>
     <p><strong>Living City:</strong> {{.LivingCity}}</p>
@@ -59,5 +56,21 @@
         </div>
     </form>
  
+
+    {{range .}}
+    <tr>
+        <td>
+            <form action="/user/profile" method="GET">
+                <input type="hidden" name="profession" value="{{.Profession}}">
+                <button type="submit">{{.Profession}}</button>
+            </form>
+        </td> 
+    </tr>
+    {{end}}
+    <form class="ex" action="/user/editCV" method="get" value="{}">
+        <div class="exit">
+            <button id="logoutButton">Edit</button>
+        </div>
+    </form>
 </body>
 </html>

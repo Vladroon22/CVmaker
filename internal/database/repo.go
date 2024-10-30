@@ -138,24 +138,24 @@ func (rp *Repo) GetProfessionCV() ([]string, error) {
 
 	for _, item := range data {
 		prof = append(prof, item)
-		rp.db.logger.Infoln("Item: ", item)
+		rp.db.logger.Infoln("Redis item: ", item)
 	}
 
 	rp.db.logger.Infoln("Profession iterated")
 	return prof, nil
 }
 
-func (rp *Repo) GetDataCV(item string) (service.CV, error) {
-	cv := service.CV{}
+func (rp *Repo) GetDataCV(item string) (*service.CV, error) {
 	data, err := rp.red.GetData(item)
 	if err != nil {
-		return service.CV{}, err
+		return nil, err
 	}
 	rp.db.logger.Infoln(data)
 
-	if err := json.Unmarshal([]byte(data), &cv); err != nil {
+	cv := &service.CV{}
+	if err := json.Unmarshal([]byte(data), cv); err != nil {
 		rp.db.logger.Errorln(err)
-		return service.CV{}, err
+		return nil, err
 	}
 
 	rp.db.logger.Infoln("Get the item")
