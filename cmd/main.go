@@ -21,7 +21,6 @@ func main() {
 	db := database.NewDB(cnf, logger)
 	if err := db.Connect(); err != nil {
 		logger.Fatalln(err)
-		return
 	}
 
 	redis := database.NewRedis(logger)
@@ -44,8 +43,9 @@ func main() {
 	sub.HandleFunc("/makeCV", h.MakeCV).Methods("PUT", "POST")
 	sub.HandleFunc("/profile", h.UserCV).Methods("GET")
 	sub.HandleFunc("/listCV", h.ListCV).Methods("GET")
-	sub.HandleFunc("/editCV", h.EditCV).Methods("GET", "PATCH")
+	sub.HandleFunc("/editCV", h.EditCV).Methods("PUT", "PATCH")
 	sub.HandleFunc("/downloadCV", h.DownLoadPDF).Methods("GET")
+	sub.HandleFunc("/deleteCV", h.DeleteCV).Methods("GET")
 
 	logger.Infoln("Server is listening --> localhost" + cnf.Addr_PORT)
 	go http.ListenAndServe(cnf.Addr_PORT, router)
@@ -57,7 +57,6 @@ func main() {
 	go func() {
 		if err := db.CloseDB(); err != nil {
 			logger.Fatalln(err)
-			return
 		}
 	}()
 

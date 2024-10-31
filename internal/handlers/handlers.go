@@ -106,7 +106,7 @@ func (h *Handlers) SignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := h.repo.GenerateJWT(id, user.Password, user.Email)
+	token, err := h.repo.GenerateJWT(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		h.logg.Errorln(err)
@@ -141,8 +141,7 @@ func (h *Handlers) MakeCV(w http.ResponseWriter, r *http.Request) {
 	cv.Education = r.FormValue("education")
 	cv.Skills = r.Form["skills"]
 
-	err := h.repo.AddNewCV(cv)
-	if err != nil {
+	if err := h.repo.AddNewCV(cv); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		h.logg.Errorln(err)
 		return
@@ -159,7 +158,7 @@ func (h *Handlers) ListCV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, pr := range Profs {
+	for i, pr := range Profs {
 		if len(Profs) == 0 {
 			h.logg.Infoln("No CVs")
 			break
@@ -170,12 +169,13 @@ func (h *Handlers) ListCV(w http.ResponseWriter, r *http.Request) {
 		}
 		cv, err := h.repo.GetDataCV(pr)
 		if cv == nil {
-			h.logg.Infoln("CV doesn't exist")
+			h.logg.Infoln("'" + pr + "'" + " doesn't exist")
+			h.red.Make("lset", "jobs", i, pr)
+			h.red.Make("lrem", "jobs", i, pr)
 			break
 		}
 		if err != nil {
-			h.logg.Errorln("Error fetching CV: ", err)
-			h.logg.Errorln(pr)
+			h.logg.Errorln("Error: ", err, " fetching CV: ", pr)
 			continue
 		}
 		h.data = append(h.data, PageUsersCV{Profession: pr})
@@ -228,6 +228,36 @@ func (h *Handlers) UserCV(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) LogOut(w http.ResponseWriter, r *http.Request) {
 	h.red.Make("del", "JWT")
 	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func (h *Handlers) DeleteCV(w http.ResponseWriter, r *http.Request) {
+	prof := r.URL.Query().Get("profession")
+	if prof == "" {
+		http.Error(w, "Profession not provided", http.StatusBadRequest)
+		h.logg.Errorln("Profession not provided")
+		return
+	}
+	for i, cv := range h.cvs {
+		if cv.Profession == prof {
+			h.red.Make("lset", "jobs", i, cv.Profession)
+			h.red.Make("lrem", "jobs", i, cv.Profession)
+			break
+		}
+	}
+	http.Redirect(w, r, "/user/listCV", http.StatusSeeOther)
+
+	tmpl, err := template.ParseFiles("./web/cv-list.html")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.logg.Errorln(err)
+		return
+	}
+	err = tmpl.Execute(w, h.data)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.logg.Errorln(err)
+		return
+	}
 }
 
 func (h *Handlers) AuthMiddleWare(next http.Handler) http.Handler {

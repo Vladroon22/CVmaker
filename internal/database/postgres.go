@@ -2,7 +2,6 @@ package database
 
 import (
 	"database/sql"
-	"fmt"
 	"time"
 
 	"github.com/Vladroon22/CVmaker/config"
@@ -25,22 +24,19 @@ func NewDB(conf *config.Config, logg *golog.Logger) *DataBase {
 
 func (d *DataBase) Connect() error {
 	if err := d.openDB(*d.config); err != nil {
-		d.logger.Errorln(err)
 		return err
 	}
 	return nil
 }
 
 func (d *DataBase) openDB(conf config.Config) error {
-	str := fmt.Sprintf("postgresql://%s", conf.DB)
+	str := "postgresql://" + conf.DB
 	db, err := sql.Open("postgres", str)
 	d.logger.Infoln(str)
 	if err != nil {
-		d.logger.Errorln(err)
 		return err
 	}
 	if err := RetryPing(db); err != nil {
-		d.logger.Errorln(err)
 		return err
 	}
 	d.sqlDB = db

@@ -157,6 +157,10 @@
                             <input type="hidden" name="profession" value="{{.Profession}}">
                             <button type="submit">Download PDF</button>
                         </form>
+                        <form action="/user/deleteCV" method="GET">
+                            <input type="hidden" name="profession" value="{{.Profession}}">
+                            <button type="submit">Delete CV</button>
+                        </form>
                     </td> 
                 </tr>
                 {{end}}

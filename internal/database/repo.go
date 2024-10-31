@@ -55,7 +55,7 @@ func (rp *Repo) Login(pass, email string) (int, error) {
 	return id, nil
 }
 
-func (rp *Repo) GenerateJWT(id int, pass, email string) (string, error) {
+func (rp *Repo) GenerateJWT(id int) (string, error) {
 	JWT, err := jwt.NewWithClaims(jwt.SigningMethodHS256, &MyClaims{
 		jwt.StandardClaims{
 			ExpiresAt: time.Now().Add(TTLofJWT).Unix(), // TTL of token

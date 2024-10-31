@@ -29,12 +29,12 @@ func Valid(user *service.UserInput) error {
 		return errors.New("wrong email input")
 	}
 	if len(user.Password) <= 7 || len(user.Password) >= 70 {
-		return errors.New("password must be more than 7 and less than 50 symbols")
+		return errors.New("password must be more than 7 and less than 70 symbols")
 	}
 	if len(user.Name) == 0 {
 		return nil
 	} else if len(user.Name) <= 3 || len(user.Name) >= 70 {
-		return errors.New("username must be more than 3 and less than 50 symbols")
+		return errors.New("username must be more than 3 and less than 70 symbols")
 	}
 	return nil
 }

@@ -55,22 +55,16 @@
             <button id="logoutButton">Log Out</button>
         </div>
     </form>
- 
 
-    {{range .}}
-    <tr>
-        <td>
-            <form action="/user/profile" method="GET">
-                <input type="hidden" name="profession" value="{{.Profession}}">
-                <button type="submit">{{.Profession}}</button>
-            </form>
-        </td> 
-    </tr>
-    {{end}}
-    <form class="ex" action="/user/editCV" method="get" value="{}">
+    
+    {{range .Profession}}
+    
+    <form class="ex" action="/user/editCV" method="get" value="{{.Profession}}">
         <div class="exit">
-            <button id="logoutButton">Edit</button>
+            <button id="logoutButton">Edit it</button>
         </div>
     </form>
+    {{end}}
+    
 </body>
 </html>
