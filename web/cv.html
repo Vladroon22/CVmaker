@@ -55,16 +55,12 @@
             <button id="logoutButton">Log Out</button>
         </div>
     </form>
-
-    
-    {{range .Profession}}
-    
+        
     <form class="ex" action="/user/editCV" method="get" value="{{.Profession}}">
         <div class="exit">
             <button id="logoutButton">Edit it</button>
         </div>
     </form>
-    {{end}}
     
 </body>
 </html>
