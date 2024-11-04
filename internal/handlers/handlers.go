@@ -56,12 +56,11 @@ func NewHandler(l *golog.Logger, r *database.Repo, s *service.Service, rd *datab
 var tmpl = template.Must(template.ParseFiles(
 	filepath.Join("web", "index.html"),
 	filepath.Join("web", "cv.html"),
-	filepath.Join("web", "cv-list.html"),
 	filepath.Join("web", "cv-edit.html"),
 ))
 
-func handler(w http.ResponseWriter, filename string, p any) {
-	err := tmpl.ExecuteTemplate(w, filename, p) // or any template name to render
+func viewHandler(w http.ResponseWriter, filename string, p any) {
+	err := tmpl.ExecuteTemplate(w, filename, p)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -70,7 +69,7 @@ func handler(w http.ResponseWriter, filename string, p any) {
 
 func (h *Handlers) HomePage(w http.ResponseWriter, r *http.Request) {
 	data := PageData{}
-	handler(w, "index.html", data)
+	viewHandler(w, "index.html", data)
 }
 
 func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
@@ -192,15 +191,13 @@ func (h *Handlers) ListCV(w http.ResponseWriter, r *http.Request) {
 		h.data = append(h.data, PageUsersCV{Profession: pr})
 		h.cvs = append(h.cvs, *cv)
 	}
-	/*
-		err = tmpl.Execute(w, h.data)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			h.logg.Errorln(err)
-			return
-		}
-	*/
-	handler(w, "cv-list.html", h.data)
+	tmpl, err := template.ParseFiles("./web/cv-list.html")
+	tmpl.Execute(w, h.data)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.logg.Errorln(err)
+		return
+	}
 }
 
 func (h *Handlers) UserCV(w http.ResponseWriter, r *http.Request) {
@@ -223,15 +220,7 @@ func (h *Handlers) UserCV(w http.ResponseWriter, r *http.Request) {
 		newSlice = append(newSlice, strings.Fields(sk)...)
 	}
 	searchCV.Skills = newSlice
-	/*
-		err := tmpl.Execute(w, searchCV)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			h.logg.Errorln(err)
-			return
-		}
-	*/
-	handler(w, "cv.html", searchCV)
+	viewHandler(w, "cv.html", searchCV)
 }
 
 func (h *Handlers) LogOut(w http.ResponseWriter, r *http.Request) {
@@ -246,29 +235,31 @@ func (h *Handlers) DeleteCV(w http.ResponseWriter, r *http.Request) {
 		h.logg.Errorln("Profession not provided")
 		return
 	}
-	for i, cv := range h.cvs {
+	for i, cv := range h.data {
 		if cv.Profession == prof {
 			h.red.Make("lset", "jobs", i, cv.Profession)
 			h.red.Make("lrem", "jobs", i, cv.Profession)
 			break
 		}
 	}
-	http.Redirect(w, r, "/user/listCV", http.StatusSeeOther)
-	/*
-		err := tmpl.Execute(w, h.data)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			h.logg.Errorln(err)
-			return
-		}
-	*/
-	handler(w, "cv-list.html", h.data)
+	tmpl, err := template.ParseFiles("./web/cv-list.html")
+	tmpl.Execute(w, h.data)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.logg.Errorln(err)
+		return
+	}
 }
 
 func (h *Handlers) AuthMiddleWare(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token, err := h.red.GetData("JWT")
-		if err != nil || token == "" {
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			h.logg.Errorln(err)
+			return
+		}
+		if token == "" {
 			http.Error(w, "JWT not exists", http.StatusUnauthorized)
 			h.logg.Errorln("JWT not exists")
 			return
@@ -305,15 +296,7 @@ func (h *Handlers) EditCV(w http.ResponseWriter, r *http.Request) {
 		newSlice = append(newSlice, strings.Fields(sk)...)
 	}
 	searchCV.Skills = newSlice
-	/*
-		err := tmpl.Execute(w, searchCV)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			h.logg.Errorln(err)
-			return
-		}
-	*/
-	handler(w, "cv-edit.html", searchCV)
+	viewHandler(w, "cv-edit.html", searchCV)
 }
 
 func (h *Handlers) DownLoadPDF(w http.ResponseWriter, r *http.Request) {

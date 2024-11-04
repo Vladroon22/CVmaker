@@ -11,6 +11,7 @@
             justify-content: center;
             align-items: center;
             background-color: #f5f5f5; 
+            gap: 10px;
         }
 
         #logoutButton {
@@ -50,17 +51,11 @@
         {{end}}
     </ul>
 
-    <form class="ex" action="/logout" method="get">
-        <div class="exit">
+    <div class="ex">
+        <form action="/logout" method="get">
             <button id="logoutButton">Log Out</button>
-        </div>
-    </form>
-        
-    <form class="ex" action="/user/editCV" method="get" value="{{.Profession}}">
-        <div class="exit">
-            <button id="logoutButton">Edit it</button>
-        </div>
-    </form>
-    
+        </form>
+    </div>
+
 </body>
 </html>

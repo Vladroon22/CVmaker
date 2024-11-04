@@ -95,7 +95,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            background-color: #f5f5f5; /* Светлый фон для страницы */
+            background-color: #f5f5f5; 
         }
 
         .exit {
@@ -130,6 +130,10 @@
         .download {
             text-align: right;
         }
+        .prof {
+            display: flex;
+            gap: 278px;
+        }
 
     </style>
 </head>
@@ -149,18 +153,20 @@
                 {{range .}}
                 <tr>
                     <td>
+                        <div class="prof">
                         <form action="/user/profile" method="GET">
                             <input type="hidden" name="profession" value="{{.Profession}}">
                             <button type="submit">{{.Profession}}</button>
+                        </form>
+                        <form action="/user/deleteCV" method="get" name="profession" value="{{.Profession}}">
+                            <input type="hidden" name="profession" value="{{.Profession}}">
+                            <button type="submit">Delete CV</button>
                         </form>
                         <form class="download" action="/user/downloadCV" method="GET">
                             <input type="hidden" name="profession" value="{{.Profession}}">
                             <button type="submit">Download PDF</button>
                         </form>
-                        <form action="/user/deleteCV" method="GET">
-                            <input type="hidden" name="profession" value="{{.Profession}}">
-                            <button type="submit">Delete CV</button>
-                        </form>
+                        </div>
                     </td> 
                 </tr>
                 {{end}}
