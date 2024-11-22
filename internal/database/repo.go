@@ -1,7 +1,6 @@
 package database
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"os"
@@ -42,9 +41,6 @@ func (rp *Repo) Login(pass, email string) (int, error) {
 	var hash string
 	query := "SELECT id, hash_password FROM users WHERE email = $1"
 	if err := rp.db.sqlDB.QueryRow(query, email).Scan(&id, &hash); err != nil {
-		if err == sql.ErrNoRows {
-			return 0, errors.New("No-such-user")
-		}
 		return 0, err
 	}
 
@@ -126,11 +122,10 @@ func (rp *Repo) AddNewCV(cv *service.CV) error {
 	return nil
 }
 
-func (rp *Repo) GetProfessionCV() ([]string, error) {
+func (rp *Repo) GetProfessions() ([]string, error) {
 	prof := []string{}
 
 	data, err := rp.red.Iterate()
-	rp.db.logger.Infoln(data)
 	if err != nil {
 		rp.db.logger.Errorln(err)
 		return nil, err
@@ -141,7 +136,6 @@ func (rp *Repo) GetProfessionCV() ([]string, error) {
 		rp.db.logger.Infoln("Redis item: ", item)
 	}
 
-	rp.db.logger.Infoln("Profession iterated")
 	return prof, nil
 }
 
@@ -150,7 +144,6 @@ func (rp *Repo) GetDataCV(item string) (*service.CV, error) {
 	if err != nil {
 		return nil, err
 	}
-	rp.db.logger.Infoln(data)
 
 	cv := &service.CV{}
 	if err := json.Unmarshal([]byte(data), cv); err != nil {
@@ -158,6 +151,5 @@ func (rp *Repo) GetDataCV(item string) (*service.CV, error) {
 		return nil, err
 	}
 
-	rp.db.logger.Infoln("Get the item")
 	return cv, nil
 }

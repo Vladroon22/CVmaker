@@ -10,7 +10,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/PuerkitoBio/goquery"
 	"github.com/Vladroon22/CVmaker/internal/database"
 	"github.com/Vladroon22/CVmaker/internal/service"
 	golog "github.com/Vladroon22/GoLog"
@@ -40,6 +39,7 @@ type Handlers struct {
 	srv  *service.Service
 	data []PageUsersCV
 	cvs  []service.CV
+	cash map[any]*service.CV
 }
 
 func NewHandler(l *golog.Logger, r *database.Repo, s *service.Service, rd *database.Redis) *Handlers {
@@ -50,6 +50,7 @@ func NewHandler(l *golog.Logger, r *database.Repo, s *service.Service, rd *datab
 		red:  rd,
 		data: make([]PageUsersCV, 0),
 		cvs:  make([]service.CV, 0),
+		cash: make(map[any]*service.CV),
 	}
 }
 
@@ -156,19 +157,20 @@ func (h *Handlers) MakeCV(w http.ResponseWriter, r *http.Request) {
 		h.logg.Errorln(err)
 		return
 	}
+	h.cash[cv.Profession] = cv
 	h.data = append(h.data, PageUsersCV{Profession: cv.Profession})
 	http.Redirect(w, r, "/user/listCV", http.StatusMovedPermanently)
 }
 
 func (h *Handlers) ListCV(w http.ResponseWriter, r *http.Request) {
-	Profs, err := h.repo.GetProfessionCV()
+	Profs, err := h.repo.GetProfessions()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		h.logg.Errorln(err)
 		return
 	}
 
-	for i, pr := range Profs {
+	for _, pr := range Profs {
 		if len(Profs) == 0 {
 			h.logg.Infoln("No CVs")
 			break
@@ -177,19 +179,20 @@ func (h *Handlers) ListCV(w http.ResponseWriter, r *http.Request) {
 			h.logg.Infoln("No new CVs")
 			break
 		}
-		cv, err := h.repo.GetDataCV(pr)
-		if cv == nil {
-			h.logg.Infoln("'" + pr + "'" + " doesn't exist")
-			h.red.Make("lset", "jobs", i, pr)
-			h.red.Make("lrem", "jobs", i, pr)
+		if cashCV, ok := h.cash[pr]; ok {
+			h.data = append(h.data, PageUsersCV{Profession: pr})
+			h.cvs = append(h.cvs, *cashCV)
+			break
+		} else if !ok {
+			cv, err := h.repo.GetDataCV(pr)
+			if err != nil {
+				h.logg.Errorln("Error: ", err, " fetching CV: ", pr)
+				continue
+			}
+			h.data = append(h.data, PageUsersCV{Profession: pr})
+			h.cvs = append(h.cvs, *cv)
 			break
 		}
-		if err != nil {
-			h.logg.Errorln("Error: ", err, " fetching CV: ", pr)
-			continue
-		}
-		h.data = append(h.data, PageUsersCV{Profession: pr})
-		h.cvs = append(h.cvs, *cv)
 	}
 	tmpl, err := template.ParseFiles("./web/cv-list.html")
 	tmpl.Execute(w, h.data)
@@ -209,10 +212,16 @@ func (h *Handlers) UserCV(w http.ResponseWriter, r *http.Request) {
 	}
 
 	searchCV := &h.srv.CV
-	for _, cv := range h.cvs {
-		if cv.Profession == prof {
-			searchCV = &cv
-			break
+	if cashCV, ok := h.cash[prof]; ok {
+		if cashCV.Profession == prof {
+			searchCV = cashCV
+		}
+	} else {
+		for _, cv := range h.cvs {
+			if cv.Profession == prof {
+				searchCV = &cv
+				break
+			}
 		}
 	}
 	newSlice := []string{}
@@ -230,38 +239,52 @@ func (h *Handlers) LogOut(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handlers) DeleteCV(w http.ResponseWriter, r *http.Request) {
 	prof := r.URL.Query().Get("profession")
-	if prof == "" {
-		http.Error(w, "Profession not provided", http.StatusBadRequest)
-		h.logg.Errorln("Profession not provided")
-		return
-	}
-	for i, cv := range h.data {
-		if cv.Profession == prof {
-			h.red.Make("lset", "jobs", i, cv.Profession)
-			h.red.Make("lrem", "jobs", i, cv.Profession)
-			break
+	h.logg.Infoln("prof: " + prof)
+
+	if cashCV, ok := h.cash[prof]; ok {
+		for i, cv := range h.cvs {
+			if cv.Profession == cashCV.Profession {
+				if i == 0 && len(h.data) > 0 {
+					h.data = h.data[i:]
+					h.cvs = h.cvs[i:]
+					delete(h.cash, cashCV.Profession)
+				} else {
+					h.data = append(h.data[:i], h.data[i+1:]...)
+					h.cvs = append(h.cvs[:i], h.cvs[i+1:]...)
+					delete(h.cash, cashCV.Profession)
+					break
+				}
+			}
 		}
-	}
-	tmpl, err := template.ParseFiles("./web/cv-list.html")
-	tmpl.Execute(w, h.data)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		h.logg.Errorln(err)
-		return
+	} else if !ok {
+		for i, cv := range h.cvs {
+			if cv.Profession == prof {
+				if i == 0 && len(h.data) > 0 {
+					h.data = h.data[i:]
+					h.cvs = h.cvs[i:]
+				} else {
+					h.data = append(h.data[:i], h.data[i+1:]...)
+					h.cvs = append(h.cvs[:i], h.cvs[i+1:]...)
+					h.red.Make("lset", "jobs", i, prof)
+					h.red.Make("lrem", "jobs", i, prof)
+					break
+				}
+			}
+		}
 	}
 }
 
 func (h *Handlers) AuthMiddleWare(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token, err := h.red.GetData("JWT")
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			h.logg.Errorln(err)
-			return
-		}
 		if token == "" {
 			http.Error(w, "JWT not exists", http.StatusUnauthorized)
 			h.logg.Errorln("JWT not exists")
+			return
+		}
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			h.logg.Errorln(err)
 			return
 		}
 		claims, err := database.ValidateToken(token)
@@ -276,6 +299,7 @@ func (h *Handlers) AuthMiddleWare(next http.Handler) http.Handler {
 	})
 }
 
+// not used yet
 func (h *Handlers) EditCV(w http.ResponseWriter, r *http.Request) {
 	prof := r.URL.Query().Get("profession")
 	if prof == "" {
@@ -285,10 +309,16 @@ func (h *Handlers) EditCV(w http.ResponseWriter, r *http.Request) {
 	}
 
 	searchCV := &h.srv.CV
-	for _, cv := range h.cvs {
-		if cv.Profession == prof {
-			searchCV = &cv
-			break
+	if cashCV, ok := h.cash[prof]; ok {
+		if cashCV.Profession == prof {
+			searchCV = cashCV
+		}
+	} else {
+		for _, cv := range h.cvs {
+			if cv.Profession == prof {
+				searchCV = &cv
+				break
+			}
 		}
 	}
 	newSlice := []string{}
@@ -308,111 +338,94 @@ func (h *Handlers) DownLoadPDF(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	URL := "http://" + r.Host + "/user/profile?profession=" + profession
-	h.logg.Infoln(URL)
-
-	resp, err := http.Get(URL)
-	if err != nil {
-		h.logg.Errorln(err)
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		http.Error(w, "Failed to retrieve the page", http.StatusInternalServerError)
-		h.logg.Fatalf("Can't get a page -> StatusCode: %d\n", resp.StatusCode)
-		return
-	}
-
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		h.logg.Fatalf("Error parsing HTML: %v\n", err)
-		return
+	cv := h.srv.CV
+	if cashCV, ok := h.cash[profession]; ok {
+		cv = *cashCV
+	} else {
+		data, err := h.red.GetData(profession)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			h.logg.Errorln(err)
+			return
+		}
+		if err := json.Unmarshal([]byte(data), &cv); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			h.logg.Errorln(err)
+			return
+		}
 	}
 
-	name := doc.Find("h1").Text()
-	age := doc.Find("p strong").Eq(0).Next().Text()
-	livingCity := doc.Find("p strong").Eq(2).Next().Text()
-	salary := doc.Find("p strong").Eq(3).Next().Text()
-	email := doc.Find("p strong").Eq(4).Next().Text()
-	phone := doc.Find("p strong").Eq(5).Next().Text()
-	education := doc.Find("p strong").Eq(6).Next().Text()
-
-	var skills []string
-	doc.Find("ul li").Each(func(i int, s *goquery.Selection) {
-		skills = append(skills, s.Text())
-	})
+	name := cv.Name
+	age := cv.Age
+	prof := cv.Profession
+	livingCity := cv.LivingCity
+	salary := cv.Salary
+	email := cv.EmailCV
+	phone := cv.PhoneNumber
+	education := cv.Education
+	skills := cv.Skills
+	h.logg.Infoln(cv)
 
 	pdf := &gopdf.GoPdf{}
 	pdf.Start(gopdf.Config{PageSize: *gopdf.PageSizeA4})
 	pdf.AddPage()
 
-	if err := pdf.AddTTFFont("openSans", "/usr/share/fonts/truetype/libreoffice/opens___.ttf"); err != nil {
+	if err := pdf.AddTTFFont("LiberationSans-Bold", "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		h.logg.Fatalln(err)
 		return
 	}
 
-	if err := pdf.SetFont("openSans", "", 14); err != nil {
+	if err := pdf.SetFont("LiberationSans-Bold", "", 12); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		h.logg.Fatalln(err)
 		return
 	}
 
-	content := name + "'s CV\n\n" +
-		"Age: " + age + "\n" +
-		"Profession: " + profession + "\n" +
-		"Living City: " + livingCity + "\n" +
-		"Salary Expectation: " + salary + "\n" +
-		"Email: " + email + "\n" +
-		"Phone: " + phone + "\n" +
-		"Education: " + education + "\n\n"
+	yPos := 20
+	lineHeight := 40
 
-	content += "Skills:\n"
-	for _, skill := range skills {
-		content += "- " + skill + "\n"
+	addTitle := func(text string) {
+		pdf.SetFont("LiberationSans-Bold", "", 16)
+		pdf.SetX(270)
+		pdf.SetY(float64(yPos))
+		pdf.Cell(nil, text)
+		yPos += lineHeight + 10
 	}
 
-	pdf.SetX(20)
-	pdf.SetY(20)
-	pdf.Cell(nil, name+"'s CV")
+	addText := func(label, value string) {
+		pdf.SetFont("LiberationSans-Bold", "", 12)
+		pdf.SetX(20)
+		pdf.SetY(float64(yPos))
+		pdf.Cell(nil, label+": "+value)
+		yPos += lineHeight
+	}
 
-	pdf.SetY(40)
-	pdf.Cell(nil, "Age: "+age)
+	addTitle(name)
+	addText("Age", strconv.Itoa(age))
+	addText("Profession", prof)
+	addText("Living City", livingCity)
+	addText("Salary Expectation", strconv.Itoa(salary))
+	addText("Email", email)
+	addText("Phone", phone)
+	addText("Education", education)
 
-	pdf.SetY(60)
-	pdf.Cell(nil, "Profession: "+profession)
-
-	pdf.SetY(80)
-	pdf.Cell(nil, "Living City: "+livingCity)
-
-	pdf.SetY(100)
-	pdf.Cell(nil, "Salary Expectation: "+salary)
-
-	pdf.SetY(120)
-	pdf.Cell(nil, "Email: "+email)
-
-	pdf.SetY(140)
-	pdf.Cell(nil, "Phone: "+phone)
-
-	pdf.SetY(160)
-	pdf.Cell(nil, "Education: "+education)
-
-	pdf.SetY(180)
+	pdf.SetFont("LiberationSans-Bold", "", 12)
+	pdf.SetX(float64(20))
+	pdf.SetY(float64(yPos))
 	pdf.Cell(nil, "Skills:")
+	yPos += 15
 
-	yPos := 200
-	for _, skill := range skills {
+	newSlice := []string{}
+	for _, sk := range skills {
+		newSlice = append(newSlice, strings.Fields(sk)...)
+	}
+
+	for _, skill := range newSlice {
+		pdf.SetX(30)
 		pdf.SetY(float64(yPos))
 		pdf.Cell(nil, "- "+skill)
-		yPos += 20
-	}
-
-	if err := pdf.Cell(nil, content); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		h.logg.Fatalln(err)
-		return
+		yPos += 15
 	}
 
 	w.Header().Set("Content-Type", "application/pdf")
