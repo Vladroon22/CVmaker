@@ -57,7 +57,6 @@ func NewHandler(l *golog.Logger, r *database.Repo, s *service.Service, rd *datab
 var tmpl = template.Must(template.ParseFiles(
 	filepath.Join("web", "index.html"),
 	filepath.Join("web", "cv.html"),
-	filepath.Join("web", "cv-edit.html"),
 ))
 
 func viewHandler(w http.ResponseWriter, filename string, p any) {
