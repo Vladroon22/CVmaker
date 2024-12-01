@@ -17,16 +17,8 @@ import (
 	"github.com/signintech/gopdf"
 )
 
-const (
-	TTL = time.Hour
-)
-
 type PageCV struct {
 	CV *service.CV
-}
-
-type PageUsersCV struct {
-	Profession string
 }
 
 type PageData struct {
@@ -38,7 +30,6 @@ type Handlers struct {
 	logg *golog.Logger
 	repo *database.Repo
 	srv  *service.Service
-	//	data []PageUsersCV
 	cvs  []service.CV
 	cash map[string]*service.CV
 }
@@ -49,7 +40,6 @@ func NewHandler(l *golog.Logger, r *database.Repo, s *service.Service, rd *datab
 		repo: r,
 		srv:  s,
 		red:  rd,
-		//		data: make([]PageUsersCV, 0),
 		cvs:  make([]service.CV, 0),
 		cash: make(map[string]*service.CV),
 	}
@@ -181,7 +171,6 @@ func (h *Handlers) ListCV(w http.ResponseWriter, r *http.Request) {
 		h.logg.Errorln(err)
 		return
 	}
-
 	for _, pr := range Profs {
 		if len(Profs) == 0 {
 			h.logg.Infoln("No CVs in redis")
@@ -192,15 +181,16 @@ func (h *Handlers) ListCV(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		if cashCV, ok := h.cash[pr]; ok {
-			h.cvs = append(h.cvs, *cashCV)
 			h.logg.Infoln("CV got from cash")
+			h.cvs = append(h.cvs, *cashCV)
 			break
-		} else if !ok {
+		} else {
 			cv, err := h.repo.GetDataCV(pr)
 			if err != nil {
 				h.logg.Errorln("Error: ", err, " fetching CV: ", pr)
 				continue
 			}
+			h.cash[pr] = cv
 			h.cvs = append(h.cvs, *cv)
 			h.logg.Infoln("CV got from redis")
 			break
