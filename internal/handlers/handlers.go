@@ -12,6 +12,7 @@ import (
 
 	"github.com/Vladroon22/CVmaker/internal/database"
 	"github.com/Vladroon22/CVmaker/internal/service"
+	"github.com/Vladroon22/CVmaker/internal/ut"
 	golog "github.com/Vladroon22/GoLog"
 	"github.com/signintech/gopdf"
 )
@@ -37,9 +38,9 @@ type Handlers struct {
 	logg *golog.Logger
 	repo *database.Repo
 	srv  *service.Service
-	data []PageUsersCV
+	//	data []PageUsersCV
 	cvs  []service.CV
-	cash map[any]*service.CV
+	cash map[string]*service.CV
 }
 
 func NewHandler(l *golog.Logger, r *database.Repo, s *service.Service, rd *database.Redis) *Handlers {
@@ -48,9 +49,9 @@ func NewHandler(l *golog.Logger, r *database.Repo, s *service.Service, rd *datab
 		repo: r,
 		srv:  s,
 		red:  rd,
-		data: make([]PageUsersCV, 0),
+		//		data: make([]PageUsersCV, 0),
 		cvs:  make([]service.CV, 0),
-		cash: make(map[any]*service.CV),
+		cash: make(map[string]*service.CV),
 	}
 }
 
@@ -103,7 +104,7 @@ func (h *Handlers) SignIn(w http.ResponseWriter, r *http.Request) {
 	user.Password = r.FormValue("password")
 	user.Email = r.FormValue("email")
 
-	if err := database.Valid(&user); err != nil {
+	if err := ut.Valid(&user); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		h.logg.Errorln(err)
 		return
@@ -138,10 +139,23 @@ func (h *Handlers) MakeCV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cv := &h.srv.CV
-	salary := r.FormValue("salary")
+
 	age := r.FormValue("age")
+	if !ut.ValidateDataAge(age) {
+		http.Error(w, "Not valid data of birth", http.StatusBadRequest)
+		h.logg.Errorln("Not valid data of birth")
+		return
+	}
+
+	parts := strings.Split(age, ".")
+	day, _ := strconv.Atoi(parts[0])
+	month, _ := strconv.Atoi(parts[1])
+	year, _ := strconv.Atoi(parts[2])
+	tm := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC)
+
+	salary := r.FormValue("salary")
 	cv.Profession = r.FormValue("profession")
-	cv.Age, _ = strconv.Atoi(age)
+	cv.Age = ut.CountUserAge(tm)
 	cv.Name = r.FormValue("name")
 	cv.Surname = r.FormValue("surname")
 	cv.PhoneNumber = r.FormValue("phone")
@@ -157,7 +171,6 @@ func (h *Handlers) MakeCV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.cash[cv.Profession] = cv
-	h.data = append(h.data, PageUsersCV{Profession: cv.Profession})
 	http.Redirect(w, r, "/user/listCV", http.StatusMovedPermanently)
 }
 
@@ -171,16 +184,16 @@ func (h *Handlers) ListCV(w http.ResponseWriter, r *http.Request) {
 
 	for _, pr := range Profs {
 		if len(Profs) == 0 {
-			h.logg.Infoln("No CVs")
+			h.logg.Infoln("No CVs in redis")
 			break
 		}
-		if len(Profs) == len(h.data) {
+		if len(Profs) == len(h.cvs) {
 			h.logg.Infoln("No new CVs")
 			break
 		}
 		if cashCV, ok := h.cash[pr]; ok {
-			h.data = append(h.data, PageUsersCV{Profession: pr})
 			h.cvs = append(h.cvs, *cashCV)
+			h.logg.Infoln("CV got from cash")
 			break
 		} else if !ok {
 			cv, err := h.repo.GetDataCV(pr)
@@ -188,13 +201,13 @@ func (h *Handlers) ListCV(w http.ResponseWriter, r *http.Request) {
 				h.logg.Errorln("Error: ", err, " fetching CV: ", pr)
 				continue
 			}
-			h.data = append(h.data, PageUsersCV{Profession: pr})
 			h.cvs = append(h.cvs, *cv)
+			h.logg.Infoln("CV got from redis")
 			break
 		}
 	}
 	tmpl, err := template.ParseFiles("./web/cv-list.html")
-	tmpl.Execute(w, h.data)
+	tmpl.Execute(w, h.cvs)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		h.logg.Errorln(err)
@@ -240,36 +253,35 @@ func (h *Handlers) DeleteCV(w http.ResponseWriter, r *http.Request) {
 	prof := r.URL.Query().Get("profession")
 	h.logg.Infoln("prof: " + prof)
 
-	if cashCV, ok := h.cash[prof]; ok {
-		for i, cv := range h.cvs {
-			if cv.Profession == cashCV.Profession {
-				if i == 0 && len(h.data) > 0 {
-					h.data = h.data[i:]
-					h.cvs = h.cvs[i:]
-					delete(h.cash, cashCV.Profession)
-				} else {
-					h.data = append(h.data[:i], h.data[i+1:]...)
-					h.cvs = append(h.cvs[:i], h.cvs[i+1:]...)
-					delete(h.cash, cashCV.Profession)
-					break
-				}
+	for i, cv := range h.cvs {
+		if cv.Profession == prof {
+			if _, ok := h.cash[prof]; ok {
+				delete(h.cash, prof)
+				h.logg.Infoln("deleted ", i, " element from cash")
+			}
+			if i == 0 && len(h.cvs) == 1 {
+				h.cvs = h.cvs[i+1:]
+				h.red.Make("lrem", "jobs", i, prof)
+				h.logg.Infoln("deleted last element from redis")
+				break
+			} else {
+				h.cvs = append(h.cvs[:i], h.cvs[i+1:]...)
+				h.red.Make("lset", "jobs", i, prof)
+				h.red.Make("lrem", "jobs", i, prof)
+				h.logg.Infoln("deleted ", i, " element from redis")
+				break
 			}
 		}
-	} else if !ok {
-		for i, cv := range h.cvs {
-			if cv.Profession == prof {
-				if i == 0 && len(h.data) > 0 {
-					h.data = h.data[i:]
-					h.cvs = h.cvs[i:]
-				} else {
-					h.data = append(h.data[:i], h.data[i+1:]...)
-					h.cvs = append(h.cvs[:i], h.cvs[i+1:]...)
-					h.red.Make("lset", "jobs", i, prof)
-					h.red.Make("lrem", "jobs", i, prof)
-					break
-				}
-			}
-		}
+	}
+
+	h.logg.Infoln(h.cvs)
+	http.Redirect(w, r, "/user/listCV", http.StatusSeeOther)
+	tmpl, err := template.ParseFiles("./web/cv-list.html")
+	tmpl.Execute(w, h.cvs)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.logg.Errorln(err)
+		return
 	}
 }
 
@@ -401,7 +413,7 @@ func (h *Handlers) DownLoadPDF(w http.ResponseWriter, r *http.Request) {
 	}
 
 	addTitle(name)
-	addText("Age", strconv.Itoa(age))
+	addText("Age", strconv.Itoa(age)) // получается ноль
 	addText("Profession", prof)
 	addText("Living City", livingCity)
 	addText("Salary Expectation", strconv.Itoa(salary))

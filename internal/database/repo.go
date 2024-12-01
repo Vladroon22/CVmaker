@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/Vladroon22/CVmaker/internal/service"
+	"github.com/Vladroon22/CVmaker/internal/ut"
+
 	"github.com/dgrijalva/jwt-go"
 )
 
@@ -44,7 +46,7 @@ func (rp *Repo) Login(pass, email string) (int, error) {
 		return 0, err
 	}
 
-	if err := CheckPassAndHash(hash, pass); err != nil {
+	if err := ut.CheckPassAndHash(hash, pass); err != nil {
 		rp.db.logger.Errorln(err)
 		return 0, err
 	}
@@ -89,11 +91,11 @@ func ValidateToken(tokenStr string) (*MyClaims, error) {
 }
 
 func (rp *Repo) CreateUser(user *service.UserInput) error {
-	if err := Valid(user); err != nil {
+	if err := ut.Valid(user); err != nil {
 		rp.db.logger.Errorln(err)
 		return err
 	}
-	enc_pass, err := Hashing(user.Password)
+	enc_pass, err := ut.Hashing(user.Password)
 	if err != nil {
 		rp.db.logger.Errorln(err)
 		return err
@@ -113,12 +115,11 @@ func (rp *Repo) AddNewCV(cv *service.CV) error {
 	if err != nil {
 		return err
 	}
-	rp.db.logger.Infoln(string(jsonData))
 	if err := rp.red.SetData(cv.Profession, string(jsonData), TTLofCV); err != nil {
 		return err
 	}
 	rp.red.Make("lpush", "jobs", cv.Profession)
-	rp.db.logger.Infoln("CV successfully added")
+	rp.db.logger.Infoln("CV successfully added in redis")
 	return nil
 }
 
