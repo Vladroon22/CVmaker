@@ -384,13 +384,11 @@ func (h *Handlers) DownLoadPDF(w http.ResponseWriter, r *http.Request) {
 	if err := pdf.AddTTFFont("LiberationSans-Bold", "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		h.logg.Fatalln(err)
-		return
 	}
 
 	if err := pdf.SetFont("LiberationSans-Bold", "", 12); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		h.logg.Fatalln(err)
-		return
 	}
 
 	yPos := 20
