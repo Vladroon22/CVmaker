@@ -3,8 +3,9 @@ package tlsserver
 import (
 	"context"
 	"crypto/tls"
-	"flag"
+	"errors"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/Vladroon22/CVmaker/config"
@@ -27,12 +28,23 @@ func New(conf *config.Config, log *golog.Logger) *Server {
 }
 
 func (s *Server) Run(router *mux.Router) error {
-	var cert, key string
-	flag.StringVar(&cert, "cert", "", "Path to the certificate file")
-	flag.StringVar(&key, "key", "", "Path to the private key file")
-	flag.Parse()
-	if cert != "" && key != "" {
-		certificate, err := tls.LoadX509KeyPair(cert, key)
+	certFile := ""
+	keyFile := ""
+
+	cFile, err := os.Stat("cert.crt")
+	if err != nil {
+		return err
+	}
+
+	kFile, err := os.Stat("Key.key")
+	if err != nil {
+		return err
+	}
+
+	certFile = cFile.Name()
+	keyFile = kFile.Name()
+	if certFile != "" && keyFile != "" {
+		certificate, err := tls.LoadX509KeyPair(certFile, keyFile)
 		if err != nil {
 			s.logger.Fatalln(err)
 		}
@@ -43,27 +55,27 @@ func (s *Server) Run(router *mux.Router) error {
 
 		s.server = &http.Server{
 			TLSConfig:      tlsConfig,
-			Addr:           s.conf.Addr_PORT,
+			Addr:           ":" + s.conf.Addr_PORT,
 			Handler:        router,
 			MaxHeaderBytes: 1 << 20,
 			WriteTimeout:   15 * time.Second,
 			ReadTimeout:    15 * time.Second,
 		}
 
-		s.logger.Infoln("Server is listening --> https://localhost", s.conf.Addr_PORT)
-		return s.server.ListenAndServeTLS(cert, key)
-	} else if cert == "" && key == "" {
+		s.logger.Infoln("Server is listening --> https://localhost", ":"+s.conf.Addr_PORT)
+		return s.server.ListenAndServeTLS(certFile, keyFile)
+	} else if certFile == "" && keyFile == "" {
 		s.server = &http.Server{
-			Addr:           s.conf.Addr_PORT,
+			Addr:           ":" + s.conf.Addr_PORT,
 			Handler:        router,
 			MaxHeaderBytes: 1 << 20,
 			WriteTimeout:   15 * time.Second,
 			ReadTimeout:    15 * time.Second,
 		}
-		s.logger.Infoln("Server is listening --> localhost", s.conf.Addr_PORT)
+		s.logger.Infoln("Server is listening --> localhost", ":"+s.conf.Addr_PORT)
 		return s.server.ListenAndServe()
 	} else {
-		return http.ErrServerClosed
+		return errors.New("Invalid-cert-or-key")
 	}
 }
 

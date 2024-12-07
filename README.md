@@ -18,7 +18,7 @@ export addr_port="your free port"
 <h2>How to run</h2>
 <h5>For SSL/TLS here used self-signed certificates<h5>
 
-``` HTTPS way: make build-ssl -> make run ```
+``` HTTPS way: make run-ssl ```
 
 ``` HTTP way: make run ```
 
