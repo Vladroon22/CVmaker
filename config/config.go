@@ -10,7 +10,7 @@ type Config struct {
 
 func CreateConfig() *Config {
 	return &Config{
-		Addr_PORT: getEnv("addr_port", ":3000"),
+		Addr_PORT: getEnv("addr_port", ":"),
 		DB:        getEnv("DB", ""),
 		JWT:       getEnv("KEY", ""),
 	}

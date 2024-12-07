@@ -107,17 +107,14 @@ func (h *Handlers) SignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := h.repo.GenerateJWT(id)
+	token, err := h.repo.GenerateJWT(id, r.RemoteAddr)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		h.logg.Errorln(err)
 		return
 	}
 
-	if err := h.red.SetData("JWT", token, time.Hour); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	SetCookie(w, "JWT", token)
 
 	http.Redirect(w, r, "/user/listCV", http.StatusSeeOther)
 }
@@ -235,7 +232,7 @@ func (h *Handlers) UserCV(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) LogOut(w http.ResponseWriter, r *http.Request) {
-	h.red.Make("del", "JWT")
+	ClearCookie(w, "JWT", "")
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
@@ -277,21 +274,21 @@ func (h *Handlers) DeleteCV(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handlers) AuthMiddleWare(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token, err := h.red.GetData("JWT")
-		if token == "" {
-			http.Error(w, "JWT not exists", http.StatusUnauthorized)
-			h.logg.Errorln("JWT not exists")
-			return
-		}
+		cookie, err := r.Cookie("JWT")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			h.logg.Errorln(err)
 			return
 		}
-		claims, err := database.ValidateToken(token)
+		claims, err := database.ValidateToken(cookie.Value)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			h.logg.Errorln(err)
+			return
+		}
+		if claims.UserIP != r.RemoteAddr {
+			http.Error(w, "Mismatched IP", http.StatusUnauthorized)
+			h.logg.Errorln(claims.UserID, ": Mismatched IP")
 			return
 		}
 		r = r.WithContext(context.WithValue(r.Context(), "id", claims.UserID))
@@ -433,10 +430,35 @@ func (h *Handlers) DownLoadPDF(w http.ResponseWriter, r *http.Request) {
 	if _, err := pdf.WriteTo(w); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		h.logg.Fatalln("Error writing PDF to response:", err)
-		return
 	}
 
 	h.logg.Infoln("PDF is successfully created: CV.pdf")
+}
+
+func SetCookie(w http.ResponseWriter, cookieName string, cookies string) {
+	cookie := &http.Cookie{
+		Name:     cookieName,
+		Value:    cookies,
+		Path:     "/",
+		Secure:   true,
+		HttpOnly: true,
+		Expires:  time.Now().Add(database.TTLofJWT),
+		SameSite: 3,
+	}
+	http.SetCookie(w, cookie)
+}
+
+func ClearCookie(w http.ResponseWriter, cookieName string, cookies string) {
+	cookie := &http.Cookie{
+		Name:     cookieName,
+		Value:    cookies,
+		Path:     "/",
+		Expires:  time.Unix(0, 0),
+		Secure:   true,
+		HttpOnly: true,
+		SameSite: 3,
+	}
+	http.SetCookie(w, cookie)
 }
 
 func WriteJSON(w http.ResponseWriter, status int, a any) error {

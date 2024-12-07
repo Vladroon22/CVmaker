@@ -19,7 +19,7 @@ type Repo struct {
 }
 
 const (
-	TTLofJWT = time.Hour * 24
+	TTLofJWT = time.Minute * 10
 	TTLofCV  = time.Hour * 24 * 7
 )
 
@@ -28,6 +28,7 @@ var SignKey = []byte(os.Getenv("KEY"))
 type MyClaims struct {
 	jwt.StandardClaims
 	UserID int `json:"id"`
+	UserIP string
 }
 
 func NewRepo(db *DataBase, s *service.Service, r *Redis) *Repo {
@@ -53,13 +54,14 @@ func (rp *Repo) Login(pass, email string) (int, error) {
 	return id, nil
 }
 
-func (rp *Repo) GenerateJWT(id int) (string, error) {
+func (rp *Repo) GenerateJWT(id int, ip string) (string, error) {
 	JWT, err := jwt.NewWithClaims(jwt.SigningMethodHS256, &MyClaims{
 		jwt.StandardClaims{
 			ExpiresAt: time.Now().Add(TTLofJWT).Unix(), // TTL of token
 			IssuedAt:  time.Now().Unix(),
 		},
 		id,
+		ip,
 	}).SignedString(SignKey)
 	if err != nil {
 		return "", err
