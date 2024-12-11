@@ -91,6 +91,16 @@ func (h *Handlers) SignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	device := func(agent string) string {
+		if strings.Contains(agent, "mobile") {
+			return "Mobile"
+		} else if strings.Contains(agent, "tablet") {
+			return "Tablet"
+		} else {
+			return "Desktop"
+		}
+	}(r.Header.Get("User-Agent"))
+
 	user.Password = r.FormValue("password")
 	user.Email = r.FormValue("email")
 
@@ -100,21 +110,21 @@ func (h *Handlers) SignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := h.repo.Login(user.Password, user.Email)
+	id, err := h.repo.Login(device, user.Password, user.Email)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		h.logg.Errorln(err)
 		return
 	}
 
-	token, err := h.repo.GenerateJWT(id, r.RemoteAddr)
+	token, err := h.repo.GenerateJWT(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		h.logg.Errorln(err)
 		return
 	}
 
-	SetCookie(w, "JWT", token)
+	SetCookie(w, "JWT", token, database.TTLofJWT)
 
 	http.Redirect(w, r, "/user/listCV", http.StatusSeeOther)
 }
@@ -168,19 +178,36 @@ func (h *Handlers) ListCV(w http.ResponseWriter, r *http.Request) {
 		h.logg.Errorln(err)
 		return
 	}
+
+	if len(Profs) == 0 {
+		h.logg.Infoln("No CVs in redis")
+		tmpl, err := template.ParseFiles("./web/cv-list.html")
+		tmpl.Execute(w, h.cvs)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			h.logg.Errorln(err)
+			return
+		}
+		tmpl.Execute(w, nil)
+		return
+	}
+
+	if len(Profs) == len(h.cvs) {
+		h.logg.Infoln("No new CVs")
+		tmpl, err := template.ParseFiles("./web/cv-list.html")
+		tmpl.Execute(w, h.cvs)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			h.logg.Errorln(err)
+			return
+		}
+		return
+	}
+
 	for _, pr := range Profs {
-		if len(Profs) == 0 {
-			h.logg.Infoln("No CVs in redis")
-			break
-		}
-		if len(Profs) == len(h.cvs) {
-			h.logg.Infoln("No new CVs")
-			break
-		}
 		if cashCV, ok := h.cash[pr]; ok {
 			h.logg.Infoln("CV got from cash")
-			h.cvs = append(h.cvs, *cashCV)
-			break
+			h.checkCVInTemplates(pr, *cashCV)
 		} else {
 			cv, err := h.repo.GetDataCV(pr)
 			if err != nil {
@@ -188,11 +215,11 @@ func (h *Handlers) ListCV(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			h.cash[pr] = cv
-			h.cvs = append(h.cvs, *cv)
+			h.checkCVInTemplates(pr, *cv)
 			h.logg.Infoln("CV got from redis")
-			break
 		}
 	}
+
 	tmpl, err := template.ParseFiles("./web/cv-list.html")
 	tmpl.Execute(w, h.cvs)
 	if err != nil {
@@ -200,6 +227,15 @@ func (h *Handlers) ListCV(w http.ResponseWriter, r *http.Request) {
 		h.logg.Errorln(err)
 		return
 	}
+}
+
+func (h *Handlers) checkCVInTemplates(prof string, cv service.CV) {
+	for _, cv := range h.cvs {
+		if cv.Profession == prof {
+			return
+		}
+	}
+	h.cvs = append(h.cvs, cv)
 }
 
 func (h *Handlers) UserCV(w http.ResponseWriter, r *http.Request) {
@@ -284,11 +320,6 @@ func (h *Handlers) AuthMiddleWare(next http.Handler) http.Handler {
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			h.logg.Errorln(err)
-			return
-		}
-		if claims.UserIP != r.RemoteAddr {
-			http.Error(w, "Mismatched IP", http.StatusUnauthorized)
-			h.logg.Errorln(claims.UserID, ": Mismatched IP")
 			return
 		}
 		r = r.WithContext(context.WithValue(r.Context(), "id", claims.UserID))
@@ -435,14 +466,14 @@ func (h *Handlers) DownLoadPDF(w http.ResponseWriter, r *http.Request) {
 	h.logg.Infoln("PDF is successfully created: CV.pdf")
 }
 
-func SetCookie(w http.ResponseWriter, cookieName string, cookies string) {
+func SetCookie(w http.ResponseWriter, cookieName string, cookies string, ttl time.Duration) {
 	cookie := &http.Cookie{
 		Name:     cookieName,
 		Value:    cookies,
 		Path:     "/",
 		Secure:   true,
 		HttpOnly: true,
-		Expires:  time.Now().Add(database.TTLofJWT),
+		Expires:  time.Now().Add(ttl),
 		SameSite: 3,
 	}
 	http.SetCookie(w, cookie)

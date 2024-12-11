@@ -1,3 +1,4 @@
+-- Active: 1733592308524@@127.0.0.1@5433@postgres
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     name VARCHAR(20),
@@ -7,3 +8,12 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 DROP TABLE IF EXISTS users;
+
+CREATE TABLE IF NOT EXISTS sessions (
+    id SERIAL PRIMARY KEY,
+    user_id INT REFERENCES users(id) NOT NULL, 
+    device_type VARCHAR(15) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP     
+)
+
+DROP TABLE IF EXISTS sessions;

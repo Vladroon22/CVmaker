@@ -3,7 +3,6 @@ package tlsserver
 import (
 	"context"
 	"crypto/tls"
-	"errors"
 	"net/http"
 	"os"
 	"time"
@@ -28,43 +27,13 @@ func New(conf *config.Config, log *golog.Logger) *Server {
 }
 
 func (s *Server) Run(router *mux.Router) error {
-	certFile := ""
-	keyFile := ""
+	certFile := "cert.crt"
+	keyFile := "Key.key"
 
-	cFile, err := os.Stat("cert.crt")
-	if err != nil {
-		return err
-	}
+	_, err1 := os.Stat("cert.crt")
+	_, err2 := os.Stat("Key.key")
 
-	kFile, err := os.Stat("Key.key")
-	if err != nil {
-		return err
-	}
-
-	certFile = cFile.Name()
-	keyFile = kFile.Name()
-	if certFile != "" && keyFile != "" {
-		certificate, err := tls.LoadX509KeyPair(certFile, keyFile)
-		if err != nil {
-			s.logger.Fatalln(err)
-		}
-
-		tlsConfig := &tls.Config{
-			Certificates: []tls.Certificate{certificate},
-		}
-
-		s.server = &http.Server{
-			TLSConfig:      tlsConfig,
-			Addr:           ":" + s.conf.Addr_PORT,
-			Handler:        router,
-			MaxHeaderBytes: 1 << 20,
-			WriteTimeout:   15 * time.Second,
-			ReadTimeout:    15 * time.Second,
-		}
-
-		s.logger.Infoln("Server is listening --> https://localhost", ":"+s.conf.Addr_PORT)
-		return s.server.ListenAndServeTLS(certFile, keyFile)
-	} else if certFile == "" && keyFile == "" {
+	if os.IsNotExist(err1) || os.IsNotExist(err2) {
 		s.server = &http.Server{
 			Addr:           ":" + s.conf.Addr_PORT,
 			Handler:        router,
@@ -74,9 +43,23 @@ func (s *Server) Run(router *mux.Router) error {
 		}
 		s.logger.Infoln("Server is listening --> localhost", ":"+s.conf.Addr_PORT)
 		return s.server.ListenAndServe()
-	} else {
-		return errors.New("Invalid-cert-or-key")
 	}
+	certificate, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		s.logger.Fatalln(err)
+	}
+
+	s.server = &http.Server{
+		TLSConfig:      &tls.Config{Certificates: []tls.Certificate{certificate}},
+		Addr:           ":" + s.conf.Addr_PORT,
+		Handler:        router,
+		MaxHeaderBytes: 1 << 20,
+		WriteTimeout:   15 * time.Second,
+		ReadTimeout:    15 * time.Second,
+	}
+
+	s.logger.Infoln("Server is listening --> https://localhost", ":"+s.conf.Addr_PORT)
+	return s.server.ListenAndServeTLS(certFile, keyFile)
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {

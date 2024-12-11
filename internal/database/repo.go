@@ -1,6 +1,8 @@
 package database
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"os"
@@ -27,8 +29,7 @@ var SignKey = []byte(os.Getenv("KEY"))
 
 type MyClaims struct {
 	jwt.StandardClaims
-	UserID int `json:"id"`
-	UserIP string
+	UserID int
 }
 
 func NewRepo(db *DataBase, s *service.Service, r *Redis) *Repo {
@@ -39,11 +40,35 @@ func NewRepo(db *DataBase, s *service.Service, r *Redis) *Repo {
 	}
 }
 
-func (rp *Repo) Login(pass, email string) (int, error) {
+func (rp *Repo) Login(device, pass, email string) (int, error) {
 	var id int
 	var hash string
-	query := "SELECT id, hash_password FROM users WHERE email = $1"
-	if err := rp.db.sqlDB.QueryRow(query, email).Scan(&id, &hash); err != nil {
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	tx, err := rp.db.sqlDB.BeginTx(ctx, &sql.TxOptions{Isolation: 2})
+	if err != nil {
+		return 0, err
+	}
+
+	query1 := "SELECT id, hash_password FROM users WHERE email = $1"
+	if err := rp.db.sqlDB.QueryRow(query1, email).Scan(&id, &hash); err != nil {
+		tx.Rollback()
+		if err == sql.ErrNoRows {
+			return 0, errors.New("Wrong-password-or-email")
+		}
+		return 0, err
+	}
+
+	query2 := "INSERT INTO sessions (user_id, device_type) VALUES ($1, $2)"
+	if _, err := rp.db.sqlDB.Exec(query2, id, device); err != nil {
+		tx.Rollback()
+		return 0, err
+	}
+
+	errTx := tx.Commit()
+	if errTx != nil {
 		return 0, err
 	}
 
@@ -54,14 +79,13 @@ func (rp *Repo) Login(pass, email string) (int, error) {
 	return id, nil
 }
 
-func (rp *Repo) GenerateJWT(id int, ip string) (string, error) {
+func (rp *Repo) GenerateJWT(id int) (string, error) {
 	JWT, err := jwt.NewWithClaims(jwt.SigningMethodHS256, &MyClaims{
 		jwt.StandardClaims{
 			ExpiresAt: time.Now().Add(TTLofJWT).Unix(), // TTL of token
 			IssuedAt:  time.Now().Unix(),
 		},
 		id,
-		ip,
 	}).SignedString(SignKey)
 	if err != nil {
 		return "", err

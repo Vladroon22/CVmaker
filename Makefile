@@ -6,7 +6,6 @@ run-ssl:
 	./app
 
 run:
-	$(MAKE) clean
 	go build -o ./app cmd/main.go
 	./app
 
