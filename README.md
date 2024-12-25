@@ -22,3 +22,7 @@ export addr_port="your free port"
 
 ``` HTTP way: make run ```
 
+```
+Now this app is hosted here - http://62.60.236.74:8080
+```
+
