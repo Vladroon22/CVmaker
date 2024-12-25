@@ -65,7 +65,7 @@ func (h *Handlers) HomePage(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		h.logg.Errorln(err)
 		return
 	}
@@ -86,7 +86,7 @@ func (h *Handlers) SignIn(w http.ResponseWriter, r *http.Request) {
 	user := h.srv.UserInput
 
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		h.logg.Errorln(err)
 		return
 	}
@@ -131,7 +131,7 @@ func (h *Handlers) SignIn(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handlers) MakeCV(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		h.logg.Errorln(err)
 		return
 	}
@@ -274,6 +274,11 @@ func (h *Handlers) LogOut(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handlers) DeleteCV(w http.ResponseWriter, r *http.Request) {
 	prof := r.URL.Query().Get("profession")
+	if prof == "" {
+		http.Error(w, "Profession not provided", http.StatusBadRequest)
+		h.logg.Errorln("Profession not provided")
+		return
+	}
 	h.logg.Infoln("prof: " + prof)
 
 	for i, cv := range h.cvs {
@@ -471,10 +476,9 @@ func SetCookie(w http.ResponseWriter, cookieName string, cookies string, ttl tim
 		Name:     cookieName,
 		Value:    cookies,
 		Path:     "/",
-		Secure:   true,
+		Secure:   false,
 		HttpOnly: true,
 		Expires:  time.Now().Add(ttl),
-		SameSite: 3,
 	}
 	http.SetCookie(w, cookie)
 }
@@ -485,9 +489,8 @@ func ClearCookie(w http.ResponseWriter, cookieName string, cookies string) {
 		Value:    cookies,
 		Path:     "/",
 		Expires:  time.Unix(0, 0),
-		Secure:   true,
+		Secure:   false,
 		HttpOnly: true,
-		SameSite: 3,
 	}
 	http.SetCookie(w, cookie)
 }
