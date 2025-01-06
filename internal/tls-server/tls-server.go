@@ -35,13 +35,13 @@ func (s *Server) Run(router *mux.Router) error {
 
 	if os.IsNotExist(err1) || os.IsNotExist(err2) {
 		s.server = &http.Server{
-			Addr:           ":" + s.conf.Addr_PORT,
+			Addr:           s.conf.Addr_PORT,
 			Handler:        router,
 			MaxHeaderBytes: 1 << 20,
 			WriteTimeout:   15 * time.Second,
 			ReadTimeout:    15 * time.Second,
 		}
-		s.logger.Infoln("Server is listening --> localhost", ":"+s.conf.Addr_PORT)
+		s.logger.Infoln("Server is listening --> http://", s.conf.Addr_PORT)
 		return s.server.ListenAndServe()
 	}
 	certificate, err := tls.LoadX509KeyPair(certFile, keyFile)
@@ -51,14 +51,14 @@ func (s *Server) Run(router *mux.Router) error {
 
 	s.server = &http.Server{
 		TLSConfig:      &tls.Config{Certificates: []tls.Certificate{certificate}},
-		Addr:           ":" + s.conf.Addr_PORT,
+		Addr:           s.conf.Addr_PORT,
 		Handler:        router,
 		MaxHeaderBytes: 1 << 20,
 		WriteTimeout:   15 * time.Second,
 		ReadTimeout:    15 * time.Second,
 	}
 
-	s.logger.Infoln("Server is listening --> https://localhost", ":"+s.conf.Addr_PORT)
+	s.logger.Infoln("Server is listening --> https://", s.conf.Addr_PORT)
 	return s.server.ListenAndServeTLS(certFile, keyFile)
 }
 

@@ -3,6 +3,7 @@ package database
 import (
 	"time"
 
+	"github.com/Vladroon22/CVmaker/config"
 	golog "github.com/Vladroon22/GoLog"
 	"github.com/go-redis/redis"
 )
@@ -12,9 +13,9 @@ type Redis struct {
 	logger *golog.Logger
 }
 
-func NewRedis(lg *golog.Logger) *Redis {
+func NewRedis(lg *golog.Logger, cnf *config.Config) *Redis {
 	client := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
+		Addr:     "localhost:" + cnf.RedisPort,
 		Password: "",
 		DB:       0,
 	})

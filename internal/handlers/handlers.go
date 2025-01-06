@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/Vladroon22/CVmaker/internal/auth"
 	"github.com/Vladroon22/CVmaker/internal/database"
 	"github.com/Vladroon22/CVmaker/internal/service"
 	"github.com/Vladroon22/CVmaker/internal/ut"
@@ -31,7 +33,7 @@ type Handlers struct {
 	repo *database.Repo
 	srv  *service.Service
 	cvs  []service.CV
-	cash map[string]*service.CV
+	cash map[int]*service.CV
 }
 
 func NewHandler(l *golog.Logger, r *database.Repo, s *service.Service, rd *database.Redis) *Handlers {
@@ -41,7 +43,7 @@ func NewHandler(l *golog.Logger, r *database.Repo, s *service.Service, rd *datab
 		srv:  s,
 		red:  rd,
 		cvs:  make([]service.CV, 0),
-		cash: make(map[string]*service.CV),
+		cash: make(map[int]*service.CV),
 	}
 }
 
@@ -64,15 +66,31 @@ func (h *Handlers) HomePage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 10<<20) // 10 MB
+	w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self';")
+
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		maxBytes := &http.MaxBytesError{}
+		if err == maxBytes {
+			http.Error(w, "Request body too large (max 10 MB)", http.StatusRequestEntityTooLarge)
+			h.logg.Errorln("Request body too large (max 10 MB)")
+			return
+		}
+		http.Error(w, "Wrong input of data", http.StatusBadRequest)
 		h.logg.Errorln(err)
 		return
 	}
+
 	user := h.srv.UserInput
 	user.Name = r.FormValue("username")
 	user.Password = r.FormValue("password")
 	user.Email = r.FormValue("email")
+
+	if err := ut.Valid(&user); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		h.logg.Errorln(err)
+		return
+	}
 
 	if err := h.repo.CreateUser(&user); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -83,10 +101,18 @@ func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) SignIn(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 10<<20) // 10 MB
+	w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self';")
 	user := h.srv.UserInput
 
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		maxBytes := &http.MaxBytesError{}
+		if err == maxBytes {
+			http.Error(w, "Request body too large (max 10 MB)", http.StatusRequestEntityTooLarge)
+			h.logg.Errorln("Request body too large (max 10 MB)")
+			return
+		}
+		http.Error(w, "Wrong input of data", http.StatusBadRequest)
 		h.logg.Errorln(err)
 		return
 	}
@@ -110,38 +136,63 @@ func (h *Handlers) SignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := h.repo.Login(device, user.Password, user.Email)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		h.logg.Errorln(err)
-		return
-	}
-
-	token, err := h.repo.GenerateJWT(id)
+	id, err := h.repo.Login(user.Password, user.Email)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		h.logg.Errorln(err)
 		return
 	}
 
-	SetCookie(w, "JWT", token, database.TTLofJWT)
-
-	http.Redirect(w, r, "/user/listCV", http.StatusSeeOther)
-}
-
-func (h *Handlers) MakeCV(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	rt, err := auth.GenerateRT()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		h.logg.Errorln(err)
 		return
 	}
+
+	if err := h.repo.SaveRT(id, rt, device); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		h.logg.Errorln(err)
+		return
+	}
+
+	token, err := auth.GenerateJWT(id)
+	if err != nil {
+		http.Error(w, "Error of creating token-session", http.StatusInternalServerError)
+		h.logg.Errorln(err)
+		return
+	}
+
+	SetCookie(w, "JWT", token, ut.TTLofJWT)
+	SetCookie(w, "RT", rt, ut.TTLofRT)
+	http.Redirect(w, r, "/user/listCV", http.StatusSeeOther)
+}
+
+func (h *Handlers) parseCVForm(r *http.Request) (*service.CV, error) {
+	id, err := getUserSession(r)
+	if err != nil {
+		h.logg.Errorln(err)
+		return nil, errors.New(err.Error())
+	}
+
 	cv := &h.srv.CV
 
 	age := r.FormValue("age")
 	if !ut.ValidateDataAge(age) {
-		http.Error(w, "Not valid data of birth", http.StatusBadRequest)
 		h.logg.Errorln("Not valid data of birth")
-		return
+		return nil, errors.New("not valid data of birth")
+	}
+
+	PhoneNumber := r.FormValue("phone")
+	if ok := ut.ValidatePhone(PhoneNumber); !ok {
+		h.logg.Errorln("Wrong phone number input in CV")
+		return nil, errors.New("wrong phone number input in CV")
+	}
+
+	email := r.FormValue("emailcv")
+	if ok := ut.ValidateEmail(email); !ok {
+		h.logg.Errorln("Wrong email input in CV")
+		return nil, errors.New("wrong email input in CV")
 	}
 
 	parts := strings.Split(age, ".")
@@ -151,28 +202,67 @@ func (h *Handlers) MakeCV(w http.ResponseWriter, r *http.Request) {
 	tm := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC)
 
 	salary := r.FormValue("salary")
-	cv.Profession = r.FormValue("profession")
+	salaryInt, err := strconv.Atoi(salary)
+	if err != nil {
+		h.logg.Errorln(err)
+		return nil, errors.New(err.Error())
+	}
+
 	cv.Age = ut.CountUserAge(tm)
+	cv.Profession = r.FormValue("profession")
 	cv.Name = r.FormValue("name")
 	cv.Surname = r.FormValue("surname")
-	cv.PhoneNumber = r.FormValue("phone")
 	cv.LivingCity = r.FormValue("city")
-	cv.EmailCV = r.FormValue("emailcv")
-	cv.Salary, _ = strconv.Atoi(salary)
 	cv.Education = r.FormValue("education")
 	cv.Skills = r.Form["skills"]
+	cv.EmailCV = email
+	cv.Salary = salaryInt
+	cv.PhoneNumber = PhoneNumber
+	cv.ID = id
 
-	if err := h.repo.AddNewCV(cv); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	return cv, nil
+}
+
+func (h *Handlers) MakeCV(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 10<<20) // 10 MB
+	w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self';")
+
+	if err := r.ParseForm(); err != nil {
+		maxBytes := &http.MaxBytesError{}
+		if err == maxBytes {
+			http.Error(w, "Request body too large (max 10 MB)", http.StatusRequestEntityTooLarge)
+			h.logg.Errorln("Request body too large (max 10 MB)")
+			return
+		}
+		http.Error(w, "Wrong input of data", http.StatusBadRequest)
 		h.logg.Errorln(err)
 		return
 	}
-	h.cash[cv.Profession] = cv
+	parsedCV, err := h.parseCVForm(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := h.repo.AddNewCV(parsedCV); err != nil {
+		http.Error(w, "Error of adding CV's data", http.StatusInternalServerError)
+		h.logg.Errorln(err)
+		return
+	}
+	h.cash[parsedCV.ID] = parsedCV
 	http.Redirect(w, r, "/user/listCV", http.StatusMovedPermanently)
 }
 
 func (h *Handlers) ListCV(w http.ResponseWriter, r *http.Request) {
-	Profs, err := h.repo.GetProfessions()
+	id, err := getUserSession(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		h.logg.Errorln(err)
+		return
+	}
+
+	h.cvs = []service.CV{}
+
+	Profs, err := h.repo.GetProfessions(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		h.logg.Errorln(err)
@@ -181,61 +271,51 @@ func (h *Handlers) ListCV(w http.ResponseWriter, r *http.Request) {
 
 	if len(Profs) == 0 {
 		h.logg.Infoln("No CVs in redis")
-		tmpl, err := template.ParseFiles("./web/cv-list.html")
-		tmpl.Execute(w, h.cvs)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			h.logg.Errorln(err)
-			return
-		}
-		tmpl.Execute(w, nil)
+		renderTemplate(w, "./web/cv-list.html", h.cvs)
 		return
 	}
 
 	if len(Profs) == len(h.cvs) {
 		h.logg.Infoln("No new CVs")
-		tmpl, err := template.ParseFiles("./web/cv-list.html")
-		tmpl.Execute(w, h.cvs)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			h.logg.Errorln(err)
-			return
-		}
+		renderTemplate(w, "./web/cv-list.html", h.cvs)
 		return
 	}
 
 	for _, pr := range Profs {
-		if cashCV, ok := h.cash[pr]; ok {
+		if cashCV, ok := h.cash[id]; ok {
 			h.logg.Infoln("CV got from cash")
-			h.checkCVInTemplates(pr, *cashCV)
-		} else {
+			h.checkCVInTemplates(id, *cashCV)
+		} else if !ok {
 			cv, err := h.repo.GetDataCV(pr)
 			if err != nil {
 				h.logg.Errorln("Error: ", err, " fetching CV: ", pr)
 				continue
 			}
-			h.cash[pr] = cv
-			h.checkCVInTemplates(pr, *cv)
+			h.cash[id] = cv
+			h.checkCVInTemplates(id, *cv)
 			h.logg.Infoln("CV got from redis")
 		}
 	}
 
-	tmpl, err := template.ParseFiles("./web/cv-list.html")
-	tmpl.Execute(w, h.cvs)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		h.logg.Errorln(err)
-		return
-	}
+	renderTemplate(w, "./web/cv-list.html", h.cvs)
 }
 
-func (h *Handlers) checkCVInTemplates(prof string, cv service.CV) {
-	for _, cv := range h.cvs {
-		if cv.Profession == prof {
+func (h *Handlers) checkCVInTemplates(id int, cv service.CV) {
+	for _, cv := range h.cvs { // bin search?
+		if cv.ID == id {
 			return
 		}
 	}
 	h.cvs = append(h.cvs, cv)
+}
+
+func renderTemplate(w http.ResponseWriter, templateFile string, data interface{}) {
+	tmpl, err := template.ParseFiles(templateFile)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	tmpl.Execute(w, data)
 }
 
 func (h *Handlers) UserCV(w http.ResponseWriter, r *http.Request) {
@@ -246,13 +326,20 @@ func (h *Handlers) UserCV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	id, err := getUserSession(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusForbidden)
+		h.logg.Errorln(err)
+		return
+	}
+
 	searchCV := &h.srv.CV
-	if cashCV, ok := h.cash[prof]; ok {
+	if cashCV, ok := h.cash[id]; ok {
 		if cashCV.Profession == prof {
 			searchCV = cashCV
 		}
 	} else {
-		for _, cv := range h.cvs {
+		for _, cv := range h.cvs { // binsearch?
 			if cv.Profession == prof {
 				searchCV = &cv
 				break
@@ -268,7 +355,8 @@ func (h *Handlers) UserCV(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) LogOut(w http.ResponseWriter, r *http.Request) {
-	ClearCookie(w, "JWT", "")
+	ClearCookie(w, "JWT")
+	ClearCookie(w, "RT")
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
@@ -279,12 +367,19 @@ func (h *Handlers) DeleteCV(w http.ResponseWriter, r *http.Request) {
 		h.logg.Errorln("Profession not provided")
 		return
 	}
+
+	id, err := getUserSession(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusForbidden)
+		h.logg.Errorln(err)
+		return
+	}
 	h.logg.Infoln("prof: " + prof)
 
 	for i, cv := range h.cvs {
-		if cv.Profession == prof {
-			if _, ok := h.cash[prof]; ok {
-				delete(h.cash, prof)
+		if cv.ID == id {
+			if _, ok := h.cash[id]; ok {
+				delete(h.cash, id)
 				h.logg.Infoln("deleted ", i, " element from cash")
 			}
 			if i == 0 && len(h.cvs) == 1 {
@@ -315,25 +410,40 @@ func (h *Handlers) DeleteCV(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handlers) AuthMiddleWare(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie("JWT")
+		cookieJWT, err := r.Cookie("JWT")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			h.logg.Errorln(err)
 			return
 		}
-		claims, err := database.ValidateToken(cookie.Value)
+		cookieRT, err := r.Cookie("RT")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			h.logg.Errorln(err)
+		}
+		claims, err := auth.ValidateJWT(cookieJWT.Value)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			h.logg.Errorln(err)
 			return
 		}
-		r = r.WithContext(context.WithValue(r.Context(), "id", claims.UserID))
+		if err := h.repo.GetRT(claims.UserID, cookieRT.Value); err != nil {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			h.logg.Errorln(err)
+			return
+		}
+		if err := h.repo.CheckExpiredRT(time.Now()); err == ut.ErrTtlExceeded {
+			h.LogOut(w, r)
+		}
+		ctx := context.WithValue(r.Context(), "id", claims.UserID)
+		r = r.WithContext(ctx)
 
 		next.ServeHTTP(w, r)
 	})
 }
 
 // not used yet
+/*
 func (h *Handlers) EditCV(w http.ResponseWriter, r *http.Request) {
 	prof := r.URL.Query().Get("profession")
 	if prof == "" {
@@ -341,10 +451,16 @@ func (h *Handlers) EditCV(w http.ResponseWriter, r *http.Request) {
 		h.logg.Errorln("Profession not provided")
 		return
 	}
+	id, err := getUserSession(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusForbidden)
+		h.logg.Errorln(err)
+		return
+	}
 
 	searchCV := &h.srv.CV
-	if cashCV, ok := h.cash[prof]; ok {
-		if cashCV.Profession == prof {
+	if cashCV, ok := h.cash[id]; ok {
+		if cashCV.ID == id {
 			searchCV = cashCV
 		}
 	} else {
@@ -362,7 +478,7 @@ func (h *Handlers) EditCV(w http.ResponseWriter, r *http.Request) {
 	searchCV.Skills = newSlice
 	viewHandler(w, "cv-edit.html", searchCV)
 }
-
+*/
 func (h *Handlers) DownLoadPDF(w http.ResponseWriter, r *http.Request) {
 	profession := r.URL.Query().Get("profession")
 	h.logg.Infoln(profession)
@@ -372,8 +488,15 @@ func (h *Handlers) DownLoadPDF(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	id, err := getUserSession(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusForbidden)
+		h.logg.Errorln(err)
+		return
+	}
+
 	cv := h.srv.CV
-	if cashCV, ok := h.cash[profession]; ok {
+	if cashCV, ok := h.cash[id]; ok {
 		cv = *cashCV
 	} else {
 		data, err := h.red.GetData(profession)
@@ -398,20 +521,21 @@ func (h *Handlers) DownLoadPDF(w http.ResponseWriter, r *http.Request) {
 	phone := cv.PhoneNumber
 	education := cv.Education
 	skills := cv.Skills
-	h.logg.Infoln(cv)
 
 	pdf := &gopdf.GoPdf{}
 	pdf.Start(gopdf.Config{PageSize: *gopdf.PageSizeA4})
 	pdf.AddPage()
 
 	if err := pdf.AddTTFFont("LiberationSans-Bold", "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		h.logg.Fatalln(err)
+		http.Error(w, "Error of Add TTF Font", http.StatusInternalServerError)
+		h.logg.Errorln(err)
+		return
 	}
 
 	if err := pdf.SetFont("LiberationSans-Bold", "", 12); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		h.logg.Fatalln(err)
+		http.Error(w, "Error of setting font", http.StatusInternalServerError)
+		h.logg.Errorln(err)
+		return
 	}
 
 	yPos := 20
@@ -434,7 +558,7 @@ func (h *Handlers) DownLoadPDF(w http.ResponseWriter, r *http.Request) {
 	}
 
 	addTitle(name)
-	addText("Age", strconv.Itoa(age)) // получается ноль
+	addText("Age", strconv.Itoa(age))
 	addText("Profession", prof)
 	addText("Living City", livingCity)
 	addText("Salary Expectation", strconv.Itoa(salary))
@@ -464,11 +588,28 @@ func (h *Handlers) DownLoadPDF(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", "attachment; filename=CV.pdf")
 
 	if _, err := pdf.WriteTo(w); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		h.logg.Fatalln("Error writing PDF to response:", err)
+		http.Error(w, "Error of creating pdf-file", http.StatusInternalServerError)
+		h.logg.Errorln("Error writing PDF to response:", err)
+		return
 	}
 
 	h.logg.Infoln("PDF is successfully created: CV.pdf")
+}
+
+func getUserSession(r *http.Request) (int, error) {
+	token, err := r.Cookie("JWT")
+	if token.Value == "" {
+		return 0, errors.New("jwt is empty")
+	}
+	if err != nil {
+		return 0, errors.New(err.Error())
+	}
+
+	claims, err := auth.ValidateJWT(token.Value)
+	if err != nil {
+		return 0, err
+	}
+	return claims.UserID, nil
 }
 
 func SetCookie(w http.ResponseWriter, cookieName string, cookies string, ttl time.Duration) {
@@ -476,27 +617,22 @@ func SetCookie(w http.ResponseWriter, cookieName string, cookies string, ttl tim
 		Name:     cookieName,
 		Value:    cookies,
 		Path:     "/",
-		Secure:   false,
+		Secure:   false, // https: true
 		HttpOnly: true,
 		Expires:  time.Now().Add(ttl),
+		SameSite: http.SameSiteStrictMode,
 	}
 	http.SetCookie(w, cookie)
 }
 
-func ClearCookie(w http.ResponseWriter, cookieName string, cookies string) {
+func ClearCookie(w http.ResponseWriter, cookieName string) {
 	cookie := &http.Cookie{
 		Name:     cookieName,
-		Value:    cookies,
+		Value:    "",
 		Path:     "/",
 		Expires:  time.Unix(0, 0),
 		Secure:   false,
 		HttpOnly: true,
 	}
 	http.SetCookie(w, cookie)
-}
-
-func WriteJSON(w http.ResponseWriter, status int, a any) error {
-	w.Header().Add("Content-Type", "application/json")
-	w.WriteHeader(status)
-	return json.NewEncoder(w).Encode(a)
 }

@@ -21,13 +21,18 @@ import (
 func main() {
 	cnf := config.CreateConfig()
 	logger := golog.New()
+	file, err := logger.SetOutput("logs.txt")
+	if err != nil {
+		logger.Fatalln(err)
+	}
+	defer file.Close()
 
 	db := database.NewDB(cnf, logger)
 	if err := db.Connect(); err != nil {
 		logger.Fatalln(err)
 	}
 
-	redis := database.NewRedis(logger)
+	redis := database.NewRedis(logger, cnf)
 
 	router := mux.NewRouter()
 	srv := service.NewService()
@@ -45,15 +50,14 @@ func main() {
 	sub.Use(h.AuthMiddleWare)
 
 	sub.HandleFunc("/deleteCV", h.DeleteCV).Methods("GET")
-	sub.HandleFunc("/makeCV", h.MakeCV).Methods("PUT", "POST")
+	sub.HandleFunc("/makeCV", h.MakeCV).Methods("POST")
 	sub.HandleFunc("/profile", h.UserCV).Methods("GET")
 	sub.HandleFunc("/listCV", h.ListCV).Methods("GET")
-	sub.HandleFunc("/editCV", h.EditCV).Methods("PUT", "PATCH")
 	sub.HandleFunc("/downloadCV", h.DownLoadPDF).Methods("GET")
 
 	serv := tlsserver.New(cnf, logger)
 	go func() {
-		if err := serv.Run(router); err != nil || err != http.ErrServerClosed {
+		if err := serv.Run(router); err != nil && err != http.ErrServerClosed {
 			logger.Fatalln(err)
 		}
 	}()
@@ -70,16 +74,15 @@ func main() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		if err := db.CloseDB(); err != nil {
-			logger.Fatalln(err)
-		}
-
 		if err := serv.Shutdown(ctx); err != nil {
-			logger.Fatalln(err)
+			logger.Errorln(err)
 		}
 
-		wg.Wait()
+		if err := db.CloseDB(); err != nil {
+			logger.Errorln(err)
+		}
 	}()
+	wg.Wait()
 
 	logger.Infoln("Gracefull shutdown")
 }

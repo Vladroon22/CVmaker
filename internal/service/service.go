@@ -1,5 +1,7 @@
 package service
 
+import "time"
+
 type UserInput struct {
 	Name     string `json:"username"`
 	Email    string `json:"email"`
@@ -7,6 +9,7 @@ type UserInput struct {
 }
 
 type CV struct {
+	ID          int      `json:"id"`
 	Name        string   `json:"name"`
 	Age         int      `json:"age"`
 	Profession  string   `json:"profession"`
@@ -24,6 +27,9 @@ type Utils interface {
 	Hashing(string) ([]byte, error)
 	ValidateEmail(string) bool
 	Valid(*UserInput) error
+	ValidatePhone(string) bool
+	ValidateDataAge(string) bool
+	CountUserAge(time.Time) int
 }
 
 type Service struct {

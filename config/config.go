@@ -6,6 +6,7 @@ type Config struct {
 	Addr_PORT string
 	DB        string
 	JWT       string
+	RedisPort string
 }
 
 func CreateConfig() *Config {
@@ -13,6 +14,7 @@ func CreateConfig() *Config {
 		Addr_PORT: getEnv("addr_port", ""),
 		DB:        getEnv("DB", ""),
 		JWT:       getEnv("KEY", ""),
+		RedisPort: getEnv("Redis", ""),
 	}
 }
 
