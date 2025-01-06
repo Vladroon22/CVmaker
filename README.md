@@ -23,3 +23,8 @@ export Redis="your free port"
 
 ``` HTTP way: make run ```
 
+<h4>The app is hosted here now</h4>
+
+```
+http://62.60.236.74:8080
+```

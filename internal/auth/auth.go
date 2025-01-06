@@ -1,8 +1,6 @@
 package auth
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"errors"
 	"time"
 
@@ -18,7 +16,7 @@ type JwtClaims struct {
 func GenerateJWT(id int) (string, error) {
 	JWT, err := jwt.NewWithClaims(jwt.SigningMethodHS256, &JwtClaims{
 		jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(ut.TTLofJWT).Unix(), // TTL of token
+			ExpiresAt: time.Now().Add(ut.TTLofJWT).UTC().Unix(), // TTL of token
 			IssuedAt:  time.Now().Unix(),
 			Issuer:    "CVmaker-Server",
 		},
@@ -29,17 +27,6 @@ func GenerateJWT(id int) (string, error) {
 	}
 
 	return JWT, nil
-}
-
-func GenerateRT() (string, error) {
-	b := make([]byte, 32)
-
-	_, err := rand.Read(b)
-	if err != nil {
-		return "", err
-	}
-
-	return base64.StdEncoding.EncodeToString(b), nil
 }
 
 func ValidateJWT(tokenStr string) (*JwtClaims, error) {

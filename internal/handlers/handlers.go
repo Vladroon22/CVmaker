@@ -143,14 +143,7 @@ func (h *Handlers) SignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rt, err := auth.GenerateRT()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		h.logg.Errorln(err)
-		return
-	}
-
-	if err := h.repo.SaveRT(id, rt, device); err != nil {
+	if err := h.repo.SaveSession(id, device); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		h.logg.Errorln(err)
 		return
@@ -164,7 +157,6 @@ func (h *Handlers) SignIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	SetCookie(w, "JWT", token, ut.TTLofJWT)
-	SetCookie(w, "RT", rt, ut.TTLofRT)
 	http.Redirect(w, r, "/user/listCV", http.StatusSeeOther)
 }
 
@@ -356,7 +348,6 @@ func (h *Handlers) UserCV(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handlers) LogOut(w http.ResponseWriter, r *http.Request) {
 	ClearCookie(w, "JWT")
-	ClearCookie(w, "RT")
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
@@ -399,41 +390,22 @@ func (h *Handlers) DeleteCV(w http.ResponseWriter, r *http.Request) {
 
 	h.logg.Infoln(h.cvs)
 	http.Redirect(w, r, "/user/listCV", http.StatusSeeOther)
-	tmpl, err := template.ParseFiles("./web/cv-list.html")
-	tmpl.Execute(w, h.cvs)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		h.logg.Errorln(err)
-		return
-	}
+	renderTemplate(w, "./web/cv-list.html", h.cvs)
 }
 
 func (h *Handlers) AuthMiddleWare(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookieJWT, err := r.Cookie("JWT")
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, "JWT is not found", http.StatusUnauthorized)
 			h.logg.Errorln(err)
 			return
-		}
-		cookieRT, err := r.Cookie("RT")
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			h.logg.Errorln(err)
 		}
 		claims, err := auth.ValidateJWT(cookieJWT.Value)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusUnauthorized)
+			http.Error(w, "Invalid JWT", http.StatusUnauthorized)
 			h.logg.Errorln(err)
 			return
-		}
-		if err := h.repo.GetRT(claims.UserID, cookieRT.Value); err != nil {
-			http.Error(w, err.Error(), http.StatusUnauthorized)
-			h.logg.Errorln(err)
-			return
-		}
-		if err := h.repo.CheckExpiredRT(time.Now()); err == ut.ErrTtlExceeded {
-			h.LogOut(w, r)
 		}
 		ctx := context.WithValue(r.Context(), "id", claims.UserID)
 		r = r.WithContext(ctx)

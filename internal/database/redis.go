@@ -1,6 +1,7 @@
 package database
 
 import (
+	"errors"
 	"time"
 
 	"github.com/Vladroon22/CVmaker/config"
@@ -35,7 +36,11 @@ func (r *Redis) SetData(item string, data interface{}, expTime time.Duration) er
 
 func (r *Redis) GetData(item string) (string, error) {
 	data, err := r.rd.Get(item).Result()
-	if err != nil {
+	if errors.Is(err, redis.Nil) {
+		r.logger.Infoln(redis.Nil)
+		return "", nil
+	} else if err != nil {
+		r.logger.Errorln("Error of fetching jobs: ", err)
 		return "", err
 	}
 	return data, nil

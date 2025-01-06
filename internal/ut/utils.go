@@ -12,8 +12,7 @@ import (
 )
 
 const (
-	TTLofRT  = time.Hour * 24
-	TTLofJWT = time.Minute * 60
+	TTLofJWT = time.Minute * 20
 	TTLofCV  = time.Hour * 24 * 7
 )
 
@@ -100,8 +99,4 @@ func Valid(user *service.UserInput) error {
 		return errors.New("username must be more than 3 and less than 70 symbols")
 	}
 	return nil
-}
-
-func BinSearch() {
-
 }

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/Vladroon22/CVmaker/internal/service"
@@ -27,16 +28,21 @@ func NewRepo(db *DataBase, s *service.Service, r *Redis) *Repo {
 
 func (rp *Repo) Login(pass, email string) (int, error) {
 	var id int
-	var hash string
+	var hash, storedEmail string
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	query1 := "SELECT id, hash_password FROM users WHERE email = $1"
-	if err := rp.db.sqlDB.QueryRowContext(ctx, query1, email).Scan(&id, &hash); err != nil {
+	query1 := "SELECT id, email, hash_password FROM users WHERE email = $1"
+	if err := rp.db.sqlDB.QueryRowContext(ctx, query1, email).Scan(&id, &storedEmail, &hash); err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			return 0, errors.New(err.Error())
 		}
+	}
+
+	if storedEmail != email {
+		rp.db.logger.Errorln("no such user's email")
+		return 0, errors.New("no such user's email")
 	}
 
 	if err := ut.CheckPassAndHash(hash, pass); err != nil {
@@ -47,96 +53,13 @@ func (rp *Repo) Login(pass, email string) (int, error) {
 	return id, nil
 }
 
-func (rp *Repo) SaveRT(id int, rt, device string) error {
+func (rp *Repo) SaveSession(id int, device string) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	query2 := "INSERT INTO sessions (user_id, device_type, refresh_token) VALUES ($1, $2, $3)"
-	if _, err := rp.db.sqlDB.ExecContext(ctx, query2, id, device, rt); err != nil {
+	query2 := "INSERT INTO sessions (user_id, device_type, created_at) VALUES ($1, $2, $3)"
+	if _, err := rp.db.sqlDB.ExecContext(ctx, query2, id, device, time.Now().UTC()); err != nil {
 		return err
-	}
-	return nil
-}
-
-func (rp *Repo) GetRT(id int, providedRT string) error {
-	if err := rp.HandleRT(id); err != nil {
-		rp.db.logger.Errorln(err)
-		return err
-	}
-	var storedRT string
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	query := "SELECT refresh_token FROM sessions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1"
-	if err := rp.db.sqlDB.QueryRowContext(ctx, query, id).Scan(&storedRT); err != nil {
-		rp.db.logger.Errorf("no such refresh token for user: %d", id)
-		return errors.New("no such refresh token")
-	}
-
-	if storedRT != providedRT {
-		rp.db.logger.Errorln("tokens not equal to each other")
-		return errors.New("tokens not equal to each other")
-	}
-
-	return nil
-}
-
-func (rp *Repo) HandleRT(id int) error {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	tx, errTx := rp.db.sqlDB.BeginTx(ctx, &sql.TxOptions{Isolation: 2})
-	if errTx != nil {
-		rp.db.logger.Errorln(errTx)
-		return errors.New("bad start of tx")
-	}
-
-	query1 := "SELECT refresh_token, created_at FROM sessions WHERE user_id = $1"
-	rows, err := tx.QueryContext(ctx, query1, id)
-	if err != nil {
-		tx.Rollback()
-		rp.db.logger.Errorf("no such refresh token for user: %d\n", id)
-		return errors.New("no such refresh token")
-	}
-	defer rows.Close()
-
-	var counterRT int
-	for rows.Next() {
-		if !rows.Next() {
-			break
-		}
-		counterRT++
-	}
-
-	if err := rows.Err(); err != nil {
-		tx.Rollback()
-		rp.db.logger.Errorln(err)
-		return errors.New(err.Error())
-	}
-
-	if counterRT > 6 {
-		query2 := "DELETE FROM sessions WHERE user_id = $1 AND created_at < (SELECT MAX(created_at) FROM sessions WHERE user_id = $1"
-		if _, err := tx.ExecContext(ctx, query2, id); err != nil {
-			tx.Rollback()
-			return err
-		}
-	}
-
-	errTx = tx.Commit()
-	if errTx != nil {
-		tx.Rollback()
-		rp.db.logger.Errorf("failed to commit tx for user: %d", id)
-		return errors.New("failed to commit tx")
-	}
-
-	return nil
-}
-
-func (rp *Repo) CheckExpiredRT(t time.Time) error {
-	expTime := t.Add(ut.TTLofRT)
-	if time.Now().After(expTime) {
-		rp.db.logger.Infoln(ut.ErrTtlExceeded)
-		return ut.ErrTtlExceeded
 	}
 	return nil
 }
@@ -205,6 +128,23 @@ func (rp *Repo) AddNewCV(cv *service.CV) error {
 	rp.db.logger.Infoln("CV successfully added in redis")
 	return nil
 }
+
+func (rp *Repo) jobHandler(chJobs chan<- string, id int, job string) error {
+	cv, err := rp.GetDataCV(job)
+	if err != nil {
+		return err
+	}
+
+	if cv == nil {
+		return nil
+	}
+
+	if cv.ID == id {
+		chJobs <- job
+	}
+	return nil
+}
+
 func (rp *Repo) GetProfessions(id int) ([]string, error) {
 	professions := []string{}
 
@@ -215,18 +155,16 @@ func (rp *Repo) GetProfessions(id int) ([]string, error) {
 	}
 
 	chJobs := make(chan string)
-	go func() { // add WaitGroup for more num of jobs
-		defer close(chJobs)
-		for _, job := range jobs {
-			cv, err := rp.GetDataCV(job)
-			if err != nil {
-				rp.db.logger.Errorln("Error of fetching jobs: ", err)
-				continue
-			}
-			if cv.ID == id {
-				chJobs <- job
-			}
-		}
+	wg := &sync.WaitGroup{}
+	for _, job := range jobs {
+		defer wg.Done()
+		wg.Add(1)
+		go rp.jobHandler(chJobs, id, job)
+	}
+
+	go func() {
+		close(chJobs)
+		wg.Wait()
 	}()
 
 	for job := range chJobs {
