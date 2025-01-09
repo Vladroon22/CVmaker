@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"path/filepath"
@@ -92,7 +91,7 @@ func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.repo.CreateUser(&user); err != nil {
+	if err := h.repo.CreateUser(r.Context(), &user); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		h.logg.Errorln(err)
 		return
@@ -136,14 +135,14 @@ func (h *Handlers) SignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := h.repo.Login(user.Password, user.Email)
+	id, err := h.repo.Login(r.Context(), user.Password, user.Email)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		h.logg.Errorln(err)
 		return
 	}
 
-	if err := h.repo.SaveSession(id, device); err != nil {
+	if err := h.repo.SaveSession(r.Context(), id, device); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		h.logg.Errorln(err)
 		return
@@ -274,17 +273,17 @@ func (h *Handlers) ListCV(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, pr := range Profs {
-		if cashCV, ok := h.cash[id]; ok {
+		if _, ok := h.cash[id]; ok {
 			h.logg.Infoln("CV got from cash")
-			h.checkCVInTemplates(id, *cashCV)
+			h.checkCVInTemplates(w, id, pr)
 		} else if !ok {
 			cv, err := h.repo.GetDataCV(pr)
-			if err != nil {
+			if !errors.Is(err, nil) {
 				h.logg.Errorln("Error: ", err, " fetching CV: ", pr)
 				continue
 			}
 			h.cash[id] = cv
-			h.checkCVInTemplates(id, *cv)
+			h.checkCVInTemplates(w, id, pr)
 			h.logg.Infoln("CV got from redis")
 		}
 	}
@@ -292,13 +291,19 @@ func (h *Handlers) ListCV(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "./web/cv-list.html", h.cvs)
 }
 
-func (h *Handlers) checkCVInTemplates(id int, cv service.CV) {
-	for _, cv := range h.cvs { // bin search?
-		if cv.ID == id {
+func (h *Handlers) checkCVInTemplates(w http.ResponseWriter, id int, prof string) {
+	searchCV, ok := ut.BinSearch(h.cvs, id)
+	if !ok {
+		cv, err := h.repo.GetDataCV(prof)
+		if err != nil {
+			http.Error(w, "Error of receive data from redis", http.StatusInternalServerError)
+			h.logg.Errorln("Error of receive data from redis: ", err)
 			return
 		}
+		h.cvs = append(h.cvs, *cv)
+		return
 	}
-	h.cvs = append(h.cvs, cv)
+	h.cvs = append(h.cvs, searchCV)
 }
 
 func renderTemplate(w http.ResponseWriter, templateFile string, data interface{}) {
@@ -325,19 +330,25 @@ func (h *Handlers) UserCV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	searchCV := &h.srv.CV
+	var existed bool
+	searchCV := h.srv.CV
 	if cashCV, ok := h.cash[id]; ok {
 		if cashCV.Profession == prof {
-			searchCV = cashCV
+			searchCV = *cashCV
 		}
 	} else {
-		for _, cv := range h.cvs { // binsearch?
-			if cv.Profession == prof {
-				searchCV = &cv
-				break
+		searchCV, existed = ut.BinSearch(h.cvs, id)
+		if !existed {
+			redisCV, err := h.repo.GetDataCV(prof)
+			if err != nil {
+				http.Error(w, "Error of receive data from redis", http.StatusInternalServerError)
+				h.logg.Errorln("Error of receive data from redis: ", err)
+				return
 			}
+			searchCV = *redisCV
 		}
 	}
+
 	newSlice := []string{}
 	for _, sk := range searchCV.Skills {
 		newSlice = append(newSlice, strings.Fields(sk)...)
@@ -395,6 +406,7 @@ func (h *Handlers) DeleteCV(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handlers) AuthMiddleWare(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var ID any = "id"
 		cookieJWT, err := r.Cookie("JWT")
 		if err != nil {
 			http.Error(w, "JWT is not found", http.StatusUnauthorized)
@@ -407,7 +419,7 @@ func (h *Handlers) AuthMiddleWare(next http.Handler) http.Handler {
 			h.logg.Errorln(err)
 			return
 		}
-		ctx := context.WithValue(r.Context(), "id", claims.UserID)
+		ctx := context.WithValue(r.Context(), ID, claims.UserID)
 		r = r.WithContext(ctx)
 
 		next.ServeHTTP(w, r)
@@ -467,33 +479,33 @@ func (h *Handlers) DownLoadPDF(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var existed bool
 	cv := h.srv.CV
 	if cashCV, ok := h.cash[id]; ok {
 		cv = *cashCV
-	} else {
-		data, err := h.red.GetData(profession)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			h.logg.Errorln(err)
-			return
-		}
-		if err := json.Unmarshal([]byte(data), &cv); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			h.logg.Errorln(err)
-			return
+	} else if !ok {
+		cv, existed = ut.BinSearch(h.cvs, id)
+		if !existed {
+			redisCV, err := h.repo.GetDataCV(profession)
+			if err != nil {
+				http.Error(w, "Error of receive data from redis", http.StatusInternalServerError)
+				h.logg.Errorln("Error of receive data from redis: ", err)
+				return
+			}
+			cv = *redisCV
 		}
 	}
-
-	name := cv.Name
-	age := cv.Age
-	prof := cv.Profession
-	livingCity := cv.LivingCity
-	salary := cv.Salary
-	email := cv.EmailCV
-	phone := cv.PhoneNumber
-	education := cv.Education
-	skills := cv.Skills
-
+	/*
+		name := cv.Name
+		age := cv.Age
+		prof := cv.Profession
+		livingCity := cv.LivingCity
+		salary := cv.Salary
+		email := cv.EmailCV
+		phone := cv.PhoneNumber
+		education := cv.Education
+		skills := cv.Skills
+	*/
 	pdf := &gopdf.GoPdf{}
 	pdf.Start(gopdf.Config{PageSize: *gopdf.PageSizeA4})
 	pdf.AddPage()
@@ -529,14 +541,14 @@ func (h *Handlers) DownLoadPDF(w http.ResponseWriter, r *http.Request) {
 		yPos += lineHeight
 	}
 
-	addTitle(name)
-	addText("Age", strconv.Itoa(age))
-	addText("Profession", prof)
-	addText("Living City", livingCity)
-	addText("Salary Expectation", strconv.Itoa(salary))
-	addText("Email", email)
-	addText("Phone", phone)
-	addText("Education", education)
+	addTitle(cv.Name)
+	addText("Age", strconv.Itoa(cv.Age))
+	addText("Profession", cv.Profession)
+	addText("Living City", cv.LivingCity)
+	addText("Salary Expectation", strconv.Itoa(cv.Salary))
+	addText("Email", cv.EmailCV)
+	addText("Phone", cv.PhoneNumber)
+	addText("Education", cv.Education)
 
 	pdf.SetFont("LiberationSans-Bold", "", 12)
 	pdf.SetX(float64(20))
@@ -545,7 +557,7 @@ func (h *Handlers) DownLoadPDF(w http.ResponseWriter, r *http.Request) {
 	yPos += 15
 
 	newSlice := []string{}
-	for _, sk := range skills {
+	for _, sk := range cv.Skills {
 		newSlice = append(newSlice, strings.Fields(sk)...)
 	}
 

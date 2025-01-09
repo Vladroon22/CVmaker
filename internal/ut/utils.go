@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -12,7 +13,7 @@ import (
 )
 
 const (
-	TTLofJWT = time.Minute * 20
+	TTLofJWT = time.Minute * 10
 	TTLofCV  = time.Hour * 24 * 7
 )
 
@@ -99,4 +100,30 @@ func Valid(user *service.UserInput) error {
 		return errors.New("username must be more than 3 and less than 70 symbols")
 	}
 	return nil
+}
+
+func BinSearch(cvs []service.CV, goal int) (service.CV, bool) {
+	if len(cvs) == 0 {
+		return service.CV{}, false
+	}
+	if len(cvs) == 1 {
+		return cvs[0], true
+	}
+
+	sort.Slice(cvs, func(i, j int) bool { return cvs[i].ID < cvs[j].ID })
+
+	beg := 0
+	end := len(cvs) - 1
+
+	for beg <= end {
+		mid := beg + (end-beg)/2
+		if cvs[mid].ID == goal {
+			return cvs[mid], true
+		} else if cvs[mid].ID < goal {
+			beg = mid + 1
+		} else {
+			end = mid - 1
+		}
+	}
+	return service.CV{}, false
 }

@@ -26,11 +26,11 @@ func NewRepo(db *DataBase, s *service.Service, r *Redis) *Repo {
 	}
 }
 
-func (rp *Repo) Login(pass, email string) (int, error) {
+func (rp *Repo) Login(c context.Context, pass, email string) (int, error) {
 	var id int
 	var hash, storedEmail string
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(c)
 	defer cancel()
 
 	query1 := "SELECT id, email, hash_password FROM users WHERE email = $1"
@@ -53,8 +53,8 @@ func (rp *Repo) Login(pass, email string) (int, error) {
 	return id, nil
 }
 
-func (rp *Repo) SaveSession(id int, device string) error {
-	ctx, cancel := context.WithCancel(context.Background())
+func (rp *Repo) SaveSession(c context.Context, id int, device string) error {
+	ctx, cancel := context.WithCancel(c)
 	defer cancel()
 
 	query2 := "INSERT INTO sessions (user_id, device_type, created_at) VALUES ($1, $2, $3)"
@@ -64,10 +64,10 @@ func (rp *Repo) SaveSession(id int, device string) error {
 	return nil
 }
 
-func (rp *Repo) CreateUser(user *service.UserInput) error {
+func (rp *Repo) CreateUser(c context.Context, user *service.UserInput) error {
 	var emailStored string
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(c)
 	defer cancel()
 
 	tx, errTx := rp.db.sqlDB.BeginTx(ctx, &sql.TxOptions{Isolation: 2})
@@ -129,42 +129,36 @@ func (rp *Repo) AddNewCV(cv *service.CV) error {
 	return nil
 }
 
-func (rp *Repo) jobHandler(chJobs chan<- string, id int, job string) error {
-	cv, err := rp.GetDataCV(job)
-	if err != nil {
-		return err
-	}
-
-	if cv == nil {
-		return nil
-	}
-
-	if cv.ID == id {
-		chJobs <- job
-	}
-	return nil
-}
-
 func (rp *Repo) GetProfessions(id int) ([]string, error) {
 	professions := []string{}
 
 	jobs, err := rp.red.Iterate()
 	if err != nil {
-		rp.db.logger.Errorln("Error of fetching jobs: ", err)
 		return nil, err
 	}
 
 	chJobs := make(chan string)
 	wg := &sync.WaitGroup{}
 	for _, job := range jobs {
-		defer wg.Done()
 		wg.Add(1)
-		go rp.jobHandler(chJobs, id, job)
+		go func(job string) {
+			defer wg.Done()
+			cv, err := rp.GetDataCV(job)
+			if err != nil {
+				return
+			}
+			if cv == nil {
+				return
+			}
+			if cv.ID == id {
+				chJobs <- job
+			}
+		}(job)
 	}
 
 	go func() {
-		close(chJobs)
 		wg.Wait()
+		close(chJobs)
 	}()
 
 	for job := range chJobs {
@@ -179,6 +173,9 @@ func (rp *Repo) GetDataCV(item string) (*service.CV, error) {
 	data, err := rp.red.GetData(item)
 	if err != nil {
 		return nil, err
+	}
+	if data == "" {
+		return nil, nil
 	}
 
 	cv := &service.CV{}
