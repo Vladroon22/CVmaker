@@ -65,17 +65,7 @@ func (h *Handlers) HomePage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 10<<20) // 10 MB
-	w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self';")
-
-	if err := r.ParseForm(); err != nil {
-		maxBytes := &http.MaxBytesError{}
-		if err == maxBytes {
-			http.Error(w, "Request body too large (max 10 MB)", http.StatusRequestEntityTooLarge)
-			h.logg.Errorln("Request body too large (max 10 MB)")
-			return
-		}
-		http.Error(w, "Wrong input of data", http.StatusBadRequest)
+	if err := h.checkValidRequest(w, r); err != nil {
 		h.logg.Errorln(err)
 		return
 	}
@@ -100,32 +90,13 @@ func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) SignIn(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 10<<20) // 10 MB
-	w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self';")
-	user := h.srv.UserInput
-
-	if err := r.ParseForm(); err != nil {
-		maxBytes := &http.MaxBytesError{}
-		if err == maxBytes {
-			http.Error(w, "Request body too large (max 10 MB)", http.StatusRequestEntityTooLarge)
-			h.logg.Errorln("Request body too large (max 10 MB)")
-			return
-		}
-		http.Error(w, "Wrong input of data", http.StatusBadRequest)
+	if err := h.checkValidRequest(w, r); err != nil {
 		h.logg.Errorln(err)
 		return
 	}
 
-	device := func(agent string) string {
-		if strings.Contains(agent, "mobile") {
-			return "Mobile"
-		} else if strings.Contains(agent, "tablet") {
-			return "Tablet"
-		} else {
-			return "Desktop"
-		}
-	}(r.Header.Get("User-Agent"))
-
+	user := h.srv.UserInput
+	device := getUserDevice(r.Header.Get("User-Agent"))
 	user.Password = r.FormValue("password")
 	user.Email = r.FormValue("email")
 
@@ -155,7 +126,7 @@ func (h *Handlers) SignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	SetCookie(w, "JWT", token, ut.TTLofJWT)
+	setCookie(w, "JWT", token, ut.TTLofJWT)
 	http.Redirect(w, r, "/user/listCV", http.StatusSeeOther)
 }
 
@@ -215,27 +186,18 @@ func (h *Handlers) parseCVForm(r *http.Request) (*service.CV, error) {
 }
 
 func (h *Handlers) MakeCV(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 10<<20) // 10 MB
-	w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self';")
-
-	if err := r.ParseForm(); err != nil {
-		maxBytes := &http.MaxBytesError{}
-		if err == maxBytes {
-			http.Error(w, "Request body too large (max 10 MB)", http.StatusRequestEntityTooLarge)
-			h.logg.Errorln("Request body too large (max 10 MB)")
-			return
-		}
-		http.Error(w, "Wrong input of data", http.StatusBadRequest)
+	if err := h.checkValidRequest(w, r); err != nil {
 		h.logg.Errorln(err)
 		return
 	}
+
 	parsedCV, err := h.parseCVForm(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	if err := h.repo.AddNewCV(parsedCV); err != nil {
-		http.Error(w, "Error of adding CV's data", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		h.logg.Errorln(err)
 		return
 	}
@@ -251,8 +213,6 @@ func (h *Handlers) ListCV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.cvs = []service.CV{}
-
 	Profs, err := h.repo.GetProfessions(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -260,6 +220,7 @@ func (h *Handlers) ListCV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.cvs = []service.CV{}
 	if len(Profs) == 0 {
 		h.logg.Infoln("No CVs in redis")
 		renderTemplate(w, "./web/cv-list.html", h.cvs)
@@ -272,38 +233,12 @@ func (h *Handlers) ListCV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, pr := range Profs {
-		if _, ok := h.cash[id]; ok {
-			h.logg.Infoln("CV got from cash")
-			h.checkCVInTemplates(w, id, pr)
-		} else if !ok {
-			cv, err := h.repo.GetDataCV(pr)
-			if !errors.Is(err, nil) {
-				h.logg.Errorln("Error: ", err, " fetching CV: ", pr)
-				continue
-			}
-			h.cash[id] = cv
-			h.checkCVInTemplates(w, id, pr)
-			h.logg.Infoln("CV got from redis")
-		}
-	}
+	h.logg.Infoln("Professions: ", Profs)
 
+	h.cvs = h.handleProfessions(Profs, id)
+
+	h.logg.Infoln("CVs: ", len(h.cvs))
 	renderTemplate(w, "./web/cv-list.html", h.cvs)
-}
-
-func (h *Handlers) checkCVInTemplates(w http.ResponseWriter, id int, prof string) {
-	searchCV, ok := ut.BinSearch(h.cvs, id)
-	if !ok {
-		cv, err := h.repo.GetDataCV(prof)
-		if err != nil {
-			http.Error(w, "Error of receive data from redis", http.StatusInternalServerError)
-			h.logg.Errorln("Error of receive data from redis: ", err)
-			return
-		}
-		h.cvs = append(h.cvs, *cv)
-		return
-	}
-	h.cvs = append(h.cvs, searchCV)
 }
 
 func renderTemplate(w http.ResponseWriter, templateFile string, data interface{}) {
@@ -330,23 +265,10 @@ func (h *Handlers) UserCV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var existed bool
-	searchCV := h.srv.CV
-	if cashCV, ok := h.cash[id]; ok {
-		if cashCV.Profession == prof {
-			searchCV = *cashCV
-		}
-	} else {
-		searchCV, existed = ut.BinSearch(h.cvs, id)
-		if !existed {
-			redisCV, err := h.repo.GetDataCV(prof)
-			if err != nil {
-				http.Error(w, "Error of receive data from redis", http.StatusInternalServerError)
-				h.logg.Errorln("Error of receive data from redis: ", err)
-				return
-			}
-			searchCV = *redisCV
-		}
+	searchCV, err := h.getUserCV(id, prof)
+	if err != nil {
+		http.Error(w, "Error of receive data from redis", http.StatusInternalServerError)
+		h.logg.Errorln("Error of receive data from redis: ", err)
 	}
 
 	newSlice := []string{}
@@ -358,7 +280,7 @@ func (h *Handlers) UserCV(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) LogOut(w http.ResponseWriter, r *http.Request) {
-	ClearCookie(w, "JWT")
+	clearCookie(w, "JWT")
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
@@ -378,28 +300,27 @@ func (h *Handlers) DeleteCV(w http.ResponseWriter, r *http.Request) {
 	}
 	h.logg.Infoln("prof: " + prof)
 
-	for i, cv := range h.cvs {
-		if cv.ID == id {
-			if _, ok := h.cash[id]; ok {
-				delete(h.cash, id)
-				h.logg.Infoln("deleted ", i, " element from cash")
-			}
-			if i == 0 && len(h.cvs) == 1 {
-				h.cvs = h.cvs[i+1:]
-				h.red.Make("lrem", "jobs", i, prof)
-				h.logg.Infoln("deleted last element from redis")
-				break
-			} else {
-				h.cvs = append(h.cvs[:i], h.cvs[i+1:]...)
-				h.red.Make("lset", "jobs", i, prof)
-				h.red.Make("lrem", "jobs", i, prof)
-				h.logg.Infoln("deleted ", i, " element from redis")
-				break
-			}
-		}
+	i := ut.BinSearchIndex(h.cvs, id, prof)
+	if i < 0 || i >= len(h.cvs) {
+		h.logg.Errorln("index out of range: ", i)
+		return
 	}
 
-	h.logg.Infoln(h.cvs)
+	if _, ok := h.cash[id]; ok {
+		delete(h.cash, id)
+		h.logg.Infoln("deleted element with ID: ", id, " from cache")
+	}
+
+	if len(h.cvs) == 1 {
+		h.cvs = h.cvs[i+1:]
+	} else {
+		h.cvs = append(h.cvs[:i], h.cvs[i+1:]...)
+	}
+
+	h.red.Make("lrem", "jobs", i, prof)
+	h.logg.Infoln("deleted element with ID: ", id, " from redis at index: ", i)
+	h.logg.Infoln("index: ", i)
+
 	http.Redirect(w, r, "/user/listCV", http.StatusSeeOther)
 	renderTemplate(w, "./web/cv-list.html", h.cvs)
 }
@@ -443,18 +364,16 @@ func (h *Handlers) EditCV(w http.ResponseWriter, r *http.Request) {
 	}
 
 	searchCV := &h.srv.CV
-	if cashCV, ok := h.cash[id]; ok {
-		if cashCV.ID == id {
-			searchCV = cashCV
-		}
-	} else {
-		for _, cv := range h.cvs {
-			if cv.Profession == prof {
-				searchCV = &cv
-				break
-			}
-		}
-	}
+	/
+	*
+	*
+	*
+	*
+	*
+	*
+	*
+	*
+	/
 	newSlice := []string{}
 	for _, sk := range searchCV.Skills {
 		newSlice = append(newSlice, strings.Fields(sk)...)
@@ -465,7 +384,7 @@ func (h *Handlers) EditCV(w http.ResponseWriter, r *http.Request) {
 */
 func (h *Handlers) DownLoadPDF(w http.ResponseWriter, r *http.Request) {
 	profession := r.URL.Query().Get("profession")
-	h.logg.Infoln(profession)
+	h.logg.Infoln("Converting in pdf... ", profession)
 	if profession == "" {
 		http.Error(w, "profession not provided", http.StatusBadRequest)
 		h.logg.Errorln("profession not provided")
@@ -479,33 +398,13 @@ func (h *Handlers) DownLoadPDF(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var existed bool
-	cv := h.srv.CV
-	if cashCV, ok := h.cash[id]; ok {
-		cv = *cashCV
-	} else if !ok {
-		cv, existed = ut.BinSearch(h.cvs, id)
-		if !existed {
-			redisCV, err := h.repo.GetDataCV(profession)
-			if err != nil {
-				http.Error(w, "Error of receive data from redis", http.StatusInternalServerError)
-				h.logg.Errorln("Error of receive data from redis: ", err)
-				return
-			}
-			cv = *redisCV
-		}
+	cv, err := h.getUserCV(id, profession)
+	if err != nil {
+		http.Error(w, "Error of receive data from redis", http.StatusInternalServerError)
+		h.logg.Errorln("Error of receive data from redis: ", err)
+		return
 	}
-	/*
-		name := cv.Name
-		age := cv.Age
-		prof := cv.Profession
-		livingCity := cv.LivingCity
-		salary := cv.Salary
-		email := cv.EmailCV
-		phone := cv.PhoneNumber
-		education := cv.Education
-		skills := cv.Skills
-	*/
+
 	pdf := &gopdf.GoPdf{}
 	pdf.Start(gopdf.Config{PageSize: *gopdf.PageSizeA4})
 	pdf.AddPage()
@@ -542,8 +441,8 @@ func (h *Handlers) DownLoadPDF(w http.ResponseWriter, r *http.Request) {
 	}
 
 	addTitle(cv.Name)
-	addText("Age", strconv.Itoa(cv.Age))
 	addText("Profession", cv.Profession)
+	addText("Age", strconv.Itoa(cv.Age))
 	addText("Living City", cv.LivingCity)
 	addText("Salary Expectation", strconv.Itoa(cv.Salary))
 	addText("Email", cv.EmailCV)
@@ -596,20 +495,20 @@ func getUserSession(r *http.Request) (int, error) {
 	return claims.UserID, nil
 }
 
-func SetCookie(w http.ResponseWriter, cookieName string, cookies string, ttl time.Duration) {
+func setCookie(w http.ResponseWriter, cookieName string, cookies string, ttl time.Duration) {
 	cookie := &http.Cookie{
 		Name:     cookieName,
 		Value:    cookies,
 		Path:     "/",
 		Secure:   false, // https: true
 		HttpOnly: true,
-		Expires:  time.Now().Add(ttl),
+		Expires:  time.Now().UTC().Add(ttl),
 		SameSite: http.SameSiteStrictMode,
 	}
 	http.SetCookie(w, cookie)
 }
 
-func ClearCookie(w http.ResponseWriter, cookieName string) {
+func clearCookie(w http.ResponseWriter, cookieName string) {
 	cookie := &http.Cookie{
 		Name:     cookieName,
 		Value:    "",
@@ -619,4 +518,66 @@ func ClearCookie(w http.ResponseWriter, cookieName string) {
 		HttpOnly: true,
 	}
 	http.SetCookie(w, cookie)
+}
+
+func (h *Handlers) getUserCV(id int, prof string) (service.CV, error) {
+	searchCV, existed := ut.BinSearch(h.cvs, id, prof)
+	if !existed {
+		redisCV, err := h.repo.GetDataCV(prof)
+		if err != nil {
+			return service.CV{}, err
+		}
+		searchCV = *redisCV
+	}
+	return searchCV, nil
+}
+
+func (h *Handlers) handleProfessions(Profs []string, id int) []service.CV {
+	for _, pr := range Profs {
+		if cashCV, ok := h.cash[id]; ok && cashCV.Profession == pr {
+			h.cvs = append(h.cvs, *cashCV)
+			h.logg.Infoln("CV from cash: ", cashCV.Profession)
+		} else {
+			cv, err := h.repo.GetDataCV(pr)
+			if err != nil {
+				h.logg.Errorln("Error: ", err, " fetching CV: ", pr)
+				continue
+			}
+			h.cash[id] = cv
+			h.cvs = append(h.cvs, *cv)
+			h.logg.Infoln("CV from redis: ", cv.Profession)
+		}
+	}
+	return h.cvs
+}
+
+func (h *Handlers) checkValidRequest(w http.ResponseWriter, r *http.Request) error {
+	r.Body = http.MaxBytesReader(w, r.Body, 10<<20) // 10 MB
+	w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self';")
+
+	if err := r.ParseForm(); err != nil {
+		maxBytes := &http.MaxBytesError{}
+		if err == maxBytes {
+			http.Error(w, "Request body too large (max 10 MB)", http.StatusRequestEntityTooLarge)
+			h.logg.Errorln("Request body too large (max 10 MB)")
+			return err
+		}
+		http.Error(w, "Wrong input of data", http.StatusBadRequest)
+		h.logg.Errorln(err)
+		return err
+	}
+	return nil
+}
+
+func getUserDevice(agent string) string {
+	device := func(agent string) string {
+		if strings.Contains(agent, "mobile") {
+			return "Mobile"
+		} else if strings.Contains(agent, "tablet") {
+			return "Tablet"
+		} else {
+			return "Desktop"
+		}
+	}(agent)
+	return device
 }

@@ -102,12 +102,9 @@ func Valid(user *service.UserInput) error {
 	return nil
 }
 
-func BinSearch(cvs []service.CV, goal int) (service.CV, bool) {
+func BinSearch(cvs []service.CV, goal int, prof string) (service.CV, bool) {
 	if len(cvs) == 0 {
 		return service.CV{}, false
-	}
-	if len(cvs) == 1 {
-		return cvs[0], true
 	}
 
 	sort.Slice(cvs, func(i, j int) bool { return cvs[i].ID < cvs[j].ID })
@@ -117,7 +114,7 @@ func BinSearch(cvs []service.CV, goal int) (service.CV, bool) {
 
 	for beg <= end {
 		mid := beg + (end-beg)/2
-		if cvs[mid].ID == goal {
+		if cvs[mid].ID == goal && cvs[mid].Profession == prof {
 			return cvs[mid], true
 		} else if cvs[mid].ID < goal {
 			beg = mid + 1
@@ -126,4 +123,12 @@ func BinSearch(cvs []service.CV, goal int) (service.CV, bool) {
 		}
 	}
 	return service.CV{}, false
+}
+
+func BinSearchIndex(cvs []service.CV, id int, prof string) int {
+	sort.Slice(cvs, func(i, j int) bool { return cvs[i].ID < cvs[j].ID })
+	index := sort.Search(len(cvs), func(i int) bool {
+		return cvs[i].ID == id && cvs[i].Profession == prof
+	})
+	return index
 }

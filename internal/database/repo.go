@@ -163,7 +163,6 @@ func (rp *Repo) GetProfessions(id int) ([]string, error) {
 
 	for job := range chJobs {
 		professions = append(professions, job)
-		rp.db.logger.Infoln("Redis item: ", job)
 	}
 
 	return professions, nil
