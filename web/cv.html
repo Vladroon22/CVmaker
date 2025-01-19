@@ -44,12 +44,22 @@
     <p><strong>Phone:</strong> {{.PhoneNumber}}</p>
     <p><strong>Education:</strong> {{.Education}}</p>
 
-    <h2>Skills</h2>
+    <h2>Hard Skills</h2>
     <ul>
-        {{range .Skills}}
+        {{range .HardSkills}}
             <li>{{.}}</li>
         {{end}}
     </ul>
+
+    <h2>Soft Skills</h2>
+    <ul>
+        {{range .SoftSkills}}
+            <li>{{.}}</li>
+        {{end}}
+    </ul>
+
+    <h2>Brief</h2>
+    <p><strong>{{.Description}}</strong></p>
 
     <div class="ex">
         <form action="/logout" method="get">

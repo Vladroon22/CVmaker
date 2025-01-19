@@ -176,7 +176,9 @@ func (h *Handlers) parseCVForm(r *http.Request) (*service.CV, error) {
 	cv.Surname = r.FormValue("surname")
 	cv.LivingCity = r.FormValue("city")
 	cv.Education = r.FormValue("education")
-	cv.Skills = r.Form["skills"]
+	cv.SoftSkills = r.Form["softskills"]
+	cv.HardSkills = r.Form["hardskills"]
+	cv.Description = r.FormValue("description")
 	cv.EmailCV = email
 	cv.Salary = salaryInt
 	cv.PhoneNumber = PhoneNumber
@@ -271,11 +273,18 @@ func (h *Handlers) UserCV(w http.ResponseWriter, r *http.Request) {
 		h.logg.Errorln("Error of receive data from redis: ", err)
 	}
 
-	newSlice := []string{}
-	for _, sk := range searchCV.Skills {
-		newSlice = append(newSlice, strings.Fields(sk)...)
+	soft := []string{}
+	for _, sk := range searchCV.SoftSkills {
+		soft = append(soft, strings.Fields(sk)...)
 	}
-	searchCV.Skills = newSlice
+	searchCV.SoftSkills = soft
+
+	hard := []string{}
+	for _, sk := range searchCV.HardSkills {
+		hard = append(hard, strings.Fields(sk)...)
+	}
+	searchCV.HardSkills = hard
+
 	viewHandler(w, "cv.html", searchCV)
 }
 
@@ -329,15 +338,15 @@ func (h *Handlers) AuthMiddleWare(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var ID any = "id"
 		cookieJWT, err := r.Cookie("JWT")
-		if err != nil {
-			http.Error(w, "JWT is not found", http.StatusUnauthorized)
-			h.logg.Errorln(err)
+		if err == http.ErrNoCookie {
+			http.Error(w, "Session expired", http.StatusUnauthorized)
+			h.logg.Errorln("Session expired: ", err)
 			return
 		}
 		claims, err := auth.ValidateJWT(cookieJWT.Value)
 		if err != nil {
 			http.Error(w, "Invalid JWT", http.StatusUnauthorized)
-			h.logg.Errorln(err)
+			h.logg.Errorln("Invalid JWT: ", err)
 			return
 		}
 		ctx := context.WithValue(r.Context(), ID, claims.UserID)
@@ -422,14 +431,14 @@ func (h *Handlers) DownLoadPDF(w http.ResponseWriter, r *http.Request) {
 	}
 
 	yPos := 20
-	lineHeight := 40
+	lineHeight := 27
 
 	addTitle := func(text string) {
 		pdf.SetFont("LiberationSans-Bold", "", 16)
-		pdf.SetX(270)
+		pdf.SetX(230)
 		pdf.SetY(float64(yPos))
 		pdf.Cell(nil, text)
-		yPos += lineHeight + 10
+		yPos += lineHeight + 15
 	}
 
 	addText := func(label, value string) {
@@ -440,7 +449,7 @@ func (h *Handlers) DownLoadPDF(w http.ResponseWriter, r *http.Request) {
 		yPos += lineHeight
 	}
 
-	addTitle(cv.Name)
+	addTitle(cv.Name + " " + cv.Surname)
 	addText("Profession", cv.Profession)
 	addText("Age", strconv.Itoa(cv.Age))
 	addText("Living City", cv.LivingCity)
@@ -452,27 +461,58 @@ func (h *Handlers) DownLoadPDF(w http.ResponseWriter, r *http.Request) {
 	pdf.SetFont("LiberationSans-Bold", "", 12)
 	pdf.SetX(float64(20))
 	pdf.SetY(float64(yPos))
-	pdf.Cell(nil, "Skills:")
+	pdf.Cell(nil, "Soft Skills:")
 	yPos += 15
 
-	newSlice := []string{}
-	for _, sk := range cv.Skills {
-		newSlice = append(newSlice, strings.Fields(sk)...)
+	soft := []string{}
+	for _, sk := range cv.SoftSkills {
+		soft = append(soft, strings.Fields(sk)...)
 	}
 
-	for _, skill := range newSlice {
+	for _, skill := range soft {
+		pdf.SetX(30)
+		pdf.SetY(float64(yPos))
+		pdf.Cell(nil, "- "+skill)
+		yPos += 15
+	}
+	yPos += 25
+
+	pdf.SetFont("LiberationSans-Bold", "", 12)
+	pdf.SetX(float64(20))
+	pdf.SetY(float64(yPos))
+	pdf.Cell(nil, "Hard Skills:")
+	yPos += 15
+
+	hard := []string{}
+	for _, sk := range cv.HardSkills {
+		hard = append(hard, strings.Fields(sk)...)
+	}
+
+	for _, skill := range hard {
 		pdf.SetX(30)
 		pdf.SetY(float64(yPos))
 		pdf.Cell(nil, "- "+skill)
 		yPos += 15
 	}
 
+	yPos += 15
+	pdf.SetFont("LiberationSans-Bold", "", 12)
+	pdf.SetX(float64(280))
+	pdf.SetY(float64(yPos))
+	pdf.Cell(nil, "Brief")
+
+	yPos += 20
+	pdf.SetFont("LiberationSans-Bold", "", 12)
+	pdf.SetX(float64(20))
+	pdf.SetY(float64(yPos))
+	pdf.Cell(nil, cv.Description)
+
 	w.Header().Set("Content-Type", "application/pdf")
 	w.Header().Set("Content-Disposition", "attachment; filename=CV.pdf")
 
 	if _, err := pdf.WriteTo(w); err != nil {
 		http.Error(w, "Error of creating pdf-file", http.StatusInternalServerError)
-		h.logg.Errorln("Error writing PDF to response:", err)
+		h.logg.Errorln("Error writing PDF to response: ", err)
 		return
 	}
 

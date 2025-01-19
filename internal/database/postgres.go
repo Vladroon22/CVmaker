@@ -32,14 +32,16 @@ func (d *DataBase) Connect() error {
 func (d *DataBase) openDB(conf config.Config) error {
 	str := "postgresql://" + conf.DB
 	db, err := sql.Open("postgres", str)
-	d.logger.Infoln(str)
 	if err != nil {
+		d.logger.Errorln(err)
 		return err
 	}
 	if err := RetryPing(db); err != nil {
+		d.logger.Errorln(err)
 		return err
 	}
 	d.sqlDB = db
+	d.logger.Infoln("Database's connection is success")
 
 	return nil
 }
@@ -48,9 +50,9 @@ func RetryPing(db *sql.DB) error {
 	var err error
 	for i := 0; i < 5; i++ {
 		if err = db.Ping(); err == nil {
-			return nil
+			break
 		}
-		time.Sleep(time.Second)
+		time.Sleep(time.Microsecond * 800)
 	}
 	return err
 }

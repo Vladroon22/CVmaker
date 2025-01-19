@@ -57,10 +57,41 @@ func (rp *Repo) SaveSession(c context.Context, id int, device string) error {
 	ctx, cancel := context.WithCancel(c)
 	defer cancel()
 
-	query2 := "INSERT INTO sessions (user_id, device_type, created_at) VALUES ($1, $2, $3)"
-	if _, err := rp.db.sqlDB.ExecContext(ctx, query2, id, device, time.Now().UTC()); err != nil {
+	tx, errTx := rp.db.sqlDB.BeginTx(ctx, &sql.TxOptions{Isolation: 2})
+	if errTx != nil {
+		rp.db.logger.Errorln(errTx)
+		return errTx
+	}
+
+	var cnt int
+	query1 := "SELECT COUNT(*) FROM sessions WHERE user_id = $1"
+	if err := tx.QueryRowContext(ctx, query1, id).Scan(&cnt); err != nil {
+		tx.Rollback()
 		return err
 	}
+
+	if cnt > 5 {
+		query2 := "DELETE FROM sessions WHERE user_id = $1"
+		if _, err := tx.ExecContext(ctx, query2, id); err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	query3 := "INSERT INTO sessions (user_id, device_type, created_at) VALUES ($1, $2, $3)"
+	if _, err := tx.ExecContext(ctx, query3, id, device, time.Now().UTC()); err != nil {
+		tx.Rollback()
+		rp.db.logger.Errorln(errTx)
+		return err
+	}
+
+	errTx = tx.Commit()
+	if errTx != nil {
+		tx.Rollback()
+		rp.db.logger.Errorln("failed to commit tx for user: ", errTx)
+		return errors.New("failed to commit tx")
+	}
+	rp.db.logger.Infoln("User successfully log in")
 	return nil
 }
 
@@ -86,6 +117,7 @@ func (rp *Repo) CreateUser(c context.Context, user *service.UserInput) error {
 
 	if emailStored == user.Email {
 		tx.Rollback()
+		rp.db.logger.Errorln("such user's email allready existed")
 		return errors.New("such user's email allready existed")
 	}
 
@@ -137,7 +169,7 @@ func (rp *Repo) GetProfessions(id int) ([]string, error) {
 		return nil, err
 	}
 
-	chJobs := make(chan string)
+	chJobs := make(chan string, 10)
 	wg := &sync.WaitGroup{}
 	for _, job := range jobs {
 		wg.Add(1)

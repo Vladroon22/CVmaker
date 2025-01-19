@@ -176,7 +176,7 @@
 
     <div class="content"> 
         <h1>Create Your CV</h1>
-        <form method="POST" method="PUT" action="/user/makeCV">
+        <form method="POST" action="/user/makeCV">
             <div class="input-group">
                 <label for="profession">Profession</label>
                 <input type="text" id="profession" name="profession" placeholder="Enter profession" required>
@@ -214,8 +214,16 @@
                 <input type="text" id="education" name="education" placeholder="Bachelor degree, Ph.d, etc..." required>
             </div>
             <div class="input-group">
-                <label for="skills">Skills</label>
-                <input type="text" id="skills" name="skills" placeholder="example C/C++ Python Confident Smart etc..." required>
+                <label for="hardskills">Hard Skills</label>
+                <input type="text" id="hardskills" name="hardskills" placeholder="example C/C++ Python etc..." required>
+            </div>
+            <div class="input-group">
+                <label for="softskills">Soft Skills</label>
+                <input type="text" id="softskills" name="softskills" placeholder="example Confident Smart etc..." required>
+            </div>
+            <div class="input-group">
+                <label for="description">Description</label>
+                <input type="text" id="description" name="description" placeholder="Introduce youself" required>
             </div>
             <button type="submit" class="btn">Create it</button> 
         </form>
