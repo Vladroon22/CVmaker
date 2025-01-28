@@ -30,8 +30,8 @@ func (s *Server) Run(router *mux.Router) error {
 	certFile := "cert.crt"
 	keyFile := "Key.key"
 
-	_, err1 := os.Stat("cert.crt")
-	_, err2 := os.Stat("Key.key")
+	_, err1 := os.Stat(certFile)
+	_, err2 := os.Stat(keyFile)
 
 	if os.IsNotExist(err1) || os.IsNotExist(err2) {
 		s.server = &http.Server{

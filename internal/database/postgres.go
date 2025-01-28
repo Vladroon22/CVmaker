@@ -1,18 +1,18 @@
 package database
 
 import (
-	"database/sql"
+	"context"
 	"time"
 
 	"github.com/Vladroon22/CVmaker/config"
 	golog "github.com/Vladroon22/GoLog"
-	_ "github.com/lib/pq"
+	pool "github.com/jackc/pgx/v5/pgxpool"
 )
 
 type DataBase struct {
 	logger *golog.Logger
 	config *config.Config
-	sqlDB  *sql.DB
+	sql    *pool.Pool
 }
 
 func NewDB(conf *config.Config, logg *golog.Logger) *DataBase {
@@ -22,41 +22,28 @@ func NewDB(conf *config.Config, logg *golog.Logger) *DataBase {
 	}
 }
 
-func (d *DataBase) Connect() error {
-	if err := d.openDB(*d.config); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (d *DataBase) openDB(conf config.Config) error {
-	str := "postgresql://" + conf.DB
-	db, err := sql.Open("postgres", str)
+func (d *DataBase) Connect(ctx context.Context) (*pool.Pool, error) {
+	pool, err := pool.New(ctx, "postgres://"+d.config.DB)
 	if err != nil {
-		d.logger.Errorln(err)
-		return err
+		return nil, err
 	}
-	if err := RetryPing(db); err != nil {
-		d.logger.Errorln(err)
-		return err
+	if err := ping(ctx, pool); err != nil {
+		return nil, err
 	}
-	d.sqlDB = db
-	d.logger.Infoln("Database's connection is success")
-
-	return nil
+	d.logger.Infoln("Database connection is valid")
+	d.sql = pool
+	return pool, nil
 }
 
-func RetryPing(db *sql.DB) error {
+func ping(c context.Context, cn *pool.Pool) error {
+	ctx, cancel := context.WithTimeout(c, time.Second*3)
+	defer cancel()
 	var err error
 	for i := 0; i < 5; i++ {
-		if err = db.Ping(); err == nil {
-			break
+		if err = cn.Ping(ctx); err == nil {
+			return nil
 		}
-		time.Sleep(time.Microsecond * 800)
+		time.Sleep(time.Millisecond * 500)
 	}
 	return err
-}
-
-func (db *DataBase) CloseDB() error {
-	return db.sqlDB.Close()
 }

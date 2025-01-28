@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Vladroon22/CVmaker/internal/service"
+	ent "github.com/Vladroon22/CVmaker/internal/entity"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -17,11 +17,7 @@ const (
 	TTLofCV  = time.Hour * 24 * 7
 )
 
-var (
-	SignKey        = []byte(os.Getenv("KEY"))
-	ErrTtlExceeded = errors.New("ttl of rt exceeded")
-	ErrRTsMoreFive = errors.New("too many rts for one user")
-)
+var SignKey = []byte(os.Getenv("KEY"))
 
 func CheckPassAndHash(hash, pass string) error {
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(pass)); err != nil {
@@ -85,7 +81,7 @@ func CountUserAge(userAge time.Time) int {
 	return currAge
 }
 
-func Valid(user *service.UserInput) error {
+func Valid(user *ent.UserInput) error {
 	if ok := ValidateEmail(user.Email); !ok {
 		return errors.New("wrong email input")
 	}
@@ -102,9 +98,9 @@ func Valid(user *service.UserInput) error {
 	return nil
 }
 
-func BinSearch(cvs []service.CV, goal int, prof string) (service.CV, bool) {
+func BinSearch(cvs []ent.CV, goal int, prof string) (ent.CV, bool) {
 	if len(cvs) == 0 {
-		return service.CV{}, false
+		return ent.CV{}, false
 	}
 
 	sort.Slice(cvs, func(i, j int) bool { return cvs[i].ID < cvs[j].ID })
@@ -122,10 +118,10 @@ func BinSearch(cvs []service.CV, goal int, prof string) (service.CV, bool) {
 			end = mid - 1
 		}
 	}
-	return service.CV{}, false
+	return ent.CV{}, false
 }
 
-func BinSearchIndex(cvs []service.CV, id int, prof string) int {
+func BinSearchIndex(cvs []ent.CV, id int, prof string) int {
 	sort.Slice(cvs, func(i, j int) bool { return cvs[i].ID < cvs[j].ID })
 	index := sort.Search(len(cvs), func(i int) bool {
 		return cvs[i].ID == id && cvs[i].Profession == prof

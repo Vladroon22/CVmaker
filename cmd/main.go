@@ -12,6 +12,7 @@ import (
 	"github.com/Vladroon22/CVmaker/config"
 	"github.com/Vladroon22/CVmaker/internal/database"
 	"github.com/Vladroon22/CVmaker/internal/handlers"
+	"github.com/Vladroon22/CVmaker/internal/repository"
 	"github.com/Vladroon22/CVmaker/internal/service"
 	tlsserver "github.com/Vladroon22/CVmaker/internal/tls-server"
 	golog "github.com/Vladroon22/GoLog"
@@ -28,17 +29,17 @@ func main() {
 	defer file.Close()
 
 	db := database.NewDB(cnf, logger)
-	if err := db.Connect(); err != nil {
+	conn, err := db.Connect(context.Background())
+	if err != nil {
 		logger.Fatalln(err)
 	}
-
 	redis := database.NewRedis(logger, cnf)
 
-	router := mux.NewRouter()
-	srv := service.NewService()
-	repo := database.NewRepo(db, srv, redis)
-	h := handlers.NewHandler(logger, repo, srv, redis)
+	repo := repository.NewRepo(conn, logger, redis)
+	srv := service.NewService(repo)
+	h := handlers.NewHandler(logger, srv, redis)
 
+	router := mux.NewRouter()
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("web"))))
 
 	router.HandleFunc("/", h.HomePage).Methods("GET")
@@ -78,9 +79,7 @@ func main() {
 			logger.Errorln(err)
 		}
 
-		if err := db.CloseDB(); err != nil {
-			logger.Errorln(err)
-		}
+		conn.Close()
 	}()
 	wg.Wait()
 
