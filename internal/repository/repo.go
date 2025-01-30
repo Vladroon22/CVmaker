@@ -10,7 +10,7 @@ import (
 
 	"github.com/Vladroon22/CVmaker/internal/database"
 	ent "github.com/Vladroon22/CVmaker/internal/entity"
-	"github.com/Vladroon22/CVmaker/internal/ut"
+	"github.com/Vladroon22/CVmaker/internal/utils"
 	golog "github.com/Vladroon22/GoLog"
 	"github.com/jackc/pgx/v5"
 	pool "github.com/jackc/pgx/v5/pgxpool"
@@ -50,7 +50,7 @@ func (rp *Repo) Login(c context.Context, pass, email string) (int, error) {
 		return 0, errors.New("no such user's email")
 	}
 
-	if err := ut.CheckPassAndHash(hash, pass); err != nil {
+	if err := utils.CheckPassAndHash(hash, pass); err != nil {
 		rp.logg.Errorln(err)
 		return 0, errors.New("wrong password input")
 	}
@@ -137,7 +137,7 @@ func (rp *Repo) CreateUser(c context.Context, user *ent.UserInput) error {
 		return errors.New("such user's email allready existed")
 	}
 
-	enc_pass, err := ut.Hashing(user.Password)
+	enc_pass, err := utils.Hashing(user.Password)
 	if err != nil {
 		rp.logg.Errorln(err)
 		return errors.New("hashing password error")
@@ -165,7 +165,7 @@ func (rp *Repo) AddNewCV(cv *ent.CV) error {
 		rp.logg.Errorln(err)
 		return err
 	}
-	if err := rp.red.SetData(cv.Profession, string(jsonData), ut.TTLofCV); err != nil {
+	if err := rp.red.SetData(cv.Profession, string(jsonData), utils.TTLofCV); err != nil {
 		rp.logg.Errorln(err)
 		return err
 	}

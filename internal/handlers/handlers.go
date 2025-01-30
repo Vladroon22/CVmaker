@@ -14,7 +14,7 @@ import (
 	"github.com/Vladroon22/CVmaker/internal/database"
 	ent "github.com/Vladroon22/CVmaker/internal/entity"
 	"github.com/Vladroon22/CVmaker/internal/service"
-	"github.com/Vladroon22/CVmaker/internal/ut"
+	"github.com/Vladroon22/CVmaker/internal/utils"
 	golog "github.com/Vladroon22/GoLog"
 	"github.com/signintech/gopdf"
 )
@@ -74,7 +74,7 @@ func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
 	user.Password = r.FormValue("password")
 	user.Email = r.FormValue("email")
 
-	if err := ut.Valid(&user); err != nil {
+	if err := utils.Valid(&user); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		h.logg.Errorln(err)
 		return
@@ -99,7 +99,7 @@ func (h *Handlers) SignIn(w http.ResponseWriter, r *http.Request) {
 	user.Password = r.FormValue("password")
 	user.Email = r.FormValue("email")
 
-	if err := ut.Valid(&user); err != nil {
+	if err := utils.Valid(&user); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		h.logg.Errorln(err)
 		return
@@ -125,7 +125,7 @@ func (h *Handlers) SignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	setCookie(w, "JWT", token, ut.TTLofJWT)
+	setCookie(w, "JWT", token, utils.TTLofJWT)
 	http.Redirect(w, r, "/user/listCV", http.StatusSeeOther)
 }
 
@@ -139,19 +139,19 @@ func (h *Handlers) parseCVForm(r *http.Request) (*ent.CV, error) {
 	cv := &ent.CV{}
 
 	age := r.FormValue("age")
-	if !ut.ValidateDataAge(age) {
+	if !utils.ValidateDataAge(age) {
 		h.logg.Errorln("Not valid data of birth")
 		return nil, errors.New("not valid data of birth")
 	}
 
 	PhoneNumber := r.FormValue("phone")
-	if ok := ut.ValidatePhone(PhoneNumber); !ok {
+	if ok := utils.ValidatePhone(PhoneNumber); !ok {
 		h.logg.Errorln("Wrong phone number input in CV")
 		return nil, errors.New("wrong phone number input in CV")
 	}
 
 	email := r.FormValue("emailcv")
-	if ok := ut.ValidateEmail(email); !ok {
+	if ok := utils.ValidateEmail(email); !ok {
 		h.logg.Errorln("Wrong email input in CV")
 		return nil, errors.New("wrong email input in CV")
 	}
@@ -169,7 +169,7 @@ func (h *Handlers) parseCVForm(r *http.Request) (*ent.CV, error) {
 		return nil, errors.New("salary set wrong format")
 	}
 
-	cv.Age = ut.CountUserAge(tm)
+	cv.Age = utils.CountUserAge(tm)
 	cv.Profession = r.FormValue("profession")
 	cv.Name = r.FormValue("name")
 	cv.Surname = r.FormValue("surname")
@@ -309,7 +309,7 @@ func (h *Handlers) DeleteCV(w http.ResponseWriter, r *http.Request) {
 	}
 	h.logg.Infoln("prof: " + prof)
 
-	i := ut.BinSearchIndex(h.cvs, id, prof)
+	i := utils.BinSearchIndex(h.cvs, id, prof)
 	if i < 0 || i >= len(h.cvs) {
 		http.Error(w, "no such profession", http.StatusBadRequest)
 		h.logg.Errorln("index out of range: ", i)
@@ -547,7 +547,7 @@ func clearCookie(w http.ResponseWriter, cookieName string) {
 }
 
 func (h *Handlers) getUserCV(id int, prof string) (ent.CV, error) {
-	searchCV, existed := ut.BinSearch(h.cvs, id, prof)
+	searchCV, existed := utils.BinSearch(h.cvs, id, prof)
 	if !existed {
 		redisCV, err := h.srv.GetDataCV(prof)
 		if err != nil {
