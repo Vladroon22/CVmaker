@@ -12,6 +12,7 @@ import (
 	ent "github.com/Vladroon22/CVmaker/internal/entity"
 	"github.com/Vladroon22/CVmaker/internal/ut"
 	golog "github.com/Vladroon22/GoLog"
+	"github.com/jackc/pgx/v5"
 	pool "github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -61,16 +62,22 @@ func (rp *Repo) SaveSession(c context.Context, id int, ip, device string) error 
 	ctx, cancel := context.WithCancel(c)
 	defer cancel()
 
-	tx, errTx := rp.db.Begin(ctx)
+	tx, errTx := rp.db.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if errTx != nil {
 		rp.logg.Errorln("Beg Tx (session): ", errTx)
 		return errors.New("bad response from database")
 	}
 
+	defer func() {
+		errRb := tx.Rollback(ctx)
+		if errRb != nil && !errors.Is(errRb, pgx.ErrTxClosed) {
+			rp.logg.Errorln("Rollback Tx (session): ", errRb)
+		}
+	}()
+
 	var cnt int
 	query1 := "SELECT COUNT(*) FROM sessions WHERE user_id = $1"
 	if err := tx.QueryRow(ctx, query1, id).Scan(&cnt); err != nil {
-		tx.Rollback(ctx)
 		rp.logg.Errorln("Tx to select (session): ", err)
 		return errors.New("bad response from database")
 	}
@@ -78,7 +85,6 @@ func (rp *Repo) SaveSession(c context.Context, id int, ip, device string) error 
 	if cnt >= 4 {
 		query2 := "DELETE FROM sessions WHERE user_id = $1"
 		if _, err := tx.Exec(ctx, query2, id); err != nil {
-			tx.Rollback(ctx)
 			rp.logg.Errorln("Tx to delete (session): ", err)
 			return errors.New("bad response from database")
 		}
@@ -86,14 +92,12 @@ func (rp *Repo) SaveSession(c context.Context, id int, ip, device string) error 
 
 	query3 := "INSERT INTO sessions (user_id, device_type, ip, created_at) VALUES ($1, $2, $3, $4)"
 	if _, err := tx.Exec(ctx, query3, id, device, ip, time.Now().UTC()); err != nil {
-		tx.Rollback(ctx)
 		rp.logg.Errorln("Tx to insert (session): ", errTx)
 		return errors.New("bad response from database")
 	}
 
 	errTx = tx.Commit(ctx)
 	if errTx != nil {
-		tx.Rollback(ctx)
 		rp.logg.Errorln("failed to commit tx (session): ", errTx)
 		return errors.New("bad response from database")
 	}
@@ -107,44 +111,46 @@ func (rp *Repo) CreateUser(c context.Context, user *ent.UserInput) error {
 	ctx, cancel := context.WithCancel(c)
 	defer cancel()
 
-	tx, errTx := rp.db.Begin(ctx)
+	tx, errTx := rp.db.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if errTx != nil {
 		rp.logg.Errorln("Beg Tx (create user): ", errTx)
 		return errTx
 	}
 
+	defer func() {
+		errRb := tx.Rollback(ctx)
+		if errRb != nil && !errors.Is(errRb, pgx.ErrTxClosed) {
+			rp.logg.Errorln("Rollback Tx (session): ", errRb)
+		}
+	}()
+
 	query1 := "SELECT email FROM users WHERE email = $1"
 	if errRows := tx.QueryRow(ctx, query1, user.Email).Scan(&emailStored); errRows != nil {
 		if !errors.Is(errRows, sql.ErrNoRows) {
-			tx.Rollback(ctx)
 			rp.logg.Errorln("bad resp (rows): ", errRows)
 			return errors.New("bad response from database")
 		}
 	}
 
 	if emailStored == user.Email {
-		tx.Rollback(ctx)
 		rp.logg.Errorln("such user's email allready existed")
 		return errors.New("such user's email allready existed")
 	}
 
 	enc_pass, err := ut.Hashing(user.Password)
 	if err != nil {
-		tx.Rollback(ctx)
 		rp.logg.Errorln(err)
 		return errors.New("hashing password error")
 	}
 
 	query := "INSERT INTO users (name, email, hash_password) VALUES ($1, $2, $3)"
 	if _, err := tx.Exec(ctx, query, user.Name, user.Email, string(enc_pass)); err != nil {
-		tx.Rollback(ctx)
 		rp.logg.Errorln("Tx to insert (create user): ", err)
 		return errors.New("bad response from database")
 	}
 
 	errTx = tx.Commit(ctx)
 	if errTx != nil {
-		tx.Rollback(ctx)
 		rp.logg.Errorln("failed to commit tx (create user): ", user.Name)
 		return errors.New("bad response from database")
 	}
