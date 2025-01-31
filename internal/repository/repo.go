@@ -22,8 +22,8 @@ type Repo struct {
 	logg *golog.Logger
 }
 
-func NewRepo(db *pool.Pool, lg *golog.Logger, r *database.Redis) Repo {
-	return Repo{
+func NewRepo(db *pool.Pool, lg *golog.Logger, r *database.Redis) *Repo {
+	return &Repo{
 		db:   db,
 		logg: lg,
 		red:  r,

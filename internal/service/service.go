@@ -4,7 +4,6 @@ import (
 	"context"
 
 	ent "github.com/Vladroon22/CVmaker/internal/entity"
-	"github.com/Vladroon22/CVmaker/internal/repository"
 )
 
 type Servicer interface {
@@ -17,10 +16,10 @@ type Servicer interface {
 }
 
 type Service struct {
-	repo repository.Repo
+	repo Servicer
 }
 
-func NewService(repo repository.Repo) Servicer {
+func NewService(repo Servicer) Servicer {
 	return &Service{repo: repo}
 }
 
