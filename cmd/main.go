@@ -28,8 +28,7 @@ func main() {
 	}
 	defer file.Close()
 
-	db := database.NewDB(cnf, logger)
-	conn, err := db.Connect(context.Background())
+	conn, err := database.NewDB(cnf, logger).Connect(context.Background())
 	if err != nil {
 		logger.Fatalln(err)
 	}

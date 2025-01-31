@@ -12,7 +12,6 @@ import (
 type DataBase struct {
 	logger *golog.Logger
 	config *config.Config
-	sql    *pool.Pool
 }
 
 func NewDB(conf *config.Config, logg *golog.Logger) *DataBase {
@@ -31,7 +30,6 @@ func (d *DataBase) Connect(ctx context.Context) (*pool.Pool, error) {
 		return nil, err
 	}
 	d.logger.Infoln("Database connection is valid")
-	d.sql = pool
 	return pool, nil
 }
 
