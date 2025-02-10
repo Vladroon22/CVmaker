@@ -96,8 +96,7 @@ func (rp *Repo) SaveSession(c context.Context, id int, ip, device string) error 
 		return errors.New("bad response from database")
 	}
 
-	errTx = tx.Commit(ctx)
-	if errTx != nil {
+	if err := tx.Commit(ctx); err != nil {
 		rp.logg.Errorln("failed to commit tx (session): ", errTx)
 		return errors.New("bad response from database")
 	}
@@ -149,8 +148,7 @@ func (rp *Repo) CreateUser(c context.Context, user *ent.UserInput) error {
 		return errors.New("bad response from database")
 	}
 
-	errTx = tx.Commit(ctx)
-	if errTx != nil {
+	if err := tx.Commit(ctx); err != nil {
 		rp.logg.Errorln("failed to commit tx (create user): ", user.Name)
 		return errors.New("bad response from database")
 	}
@@ -182,7 +180,7 @@ func (rp *Repo) GetProfessions(id int) ([]string, error) {
 		return nil, err
 	}
 
-	chJobs := make(chan string, 10)
+	chJobs := make(chan string, len(jobs))
 	wg := &sync.WaitGroup{}
 	for _, job := range jobs {
 		wg.Add(1)

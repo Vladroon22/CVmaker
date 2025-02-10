@@ -121,8 +121,5 @@ func BinSearch(cvs []ent.CV, goal int, prof string) (ent.CV, bool) {
 
 func BinSearchIndex(cvs []ent.CV, id int, prof string) int {
 	sort.Slice(cvs, func(i, j int) bool { return cvs[i].ID < cvs[j].ID })
-	index := sort.Search(len(cvs), func(i int) bool {
-		return cvs[i].ID == id && cvs[i].Profession == prof
-	})
-	return index
+	return sort.Search(len(cvs), func(i int) bool { return cvs[i].ID == id && cvs[i].Profession == prof })
 }

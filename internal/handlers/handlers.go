@@ -480,7 +480,7 @@ func (h *Handlers) DownLoadPDF(w http.ResponseWriter, r *http.Request) {
 			yPos += 15
 		}
 	}
-	if cv.Description == "" {
+	if cv.Description != "" {
 		yPos += 15
 		pdf.SetFont("LiberationSans-Bold", "", 12)
 		pdf.SetX(float64(280))
