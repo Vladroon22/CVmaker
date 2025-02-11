@@ -28,7 +28,3 @@ export Redis="your free port"
 ```
 http://62.60.236.74:8080
 ```
-or
-```
-https://62.60.236.74:8443
-```
