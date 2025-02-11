@@ -133,7 +133,7 @@ func (h *Handlers) parseCVForm(r *http.Request) (*ent.CV, error) {
 	id, err := getUserSession(r)
 	if err != nil {
 		h.logg.Errorln(err)
-		return nil, errors.New(err.Error())
+		return nil, errors.New("CV wasn't find")
 	}
 
 	cv := &ent.CV{}
@@ -180,6 +180,7 @@ func (h *Handlers) parseCVForm(r *http.Request) (*ent.CV, error) {
 	cv.Description = r.FormValue("description")
 	cv.EmailCV = email
 	cv.Salary = salaryInt
+	cv.Currency = r.FormValue("currency")
 	cv.PhoneNumber = PhoneNumber
 	cv.ID = id
 
@@ -209,7 +210,7 @@ func (h *Handlers) MakeCV(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) ListCV(w http.ResponseWriter, r *http.Request) {
 	id, err := getUserSession(r)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
+		http.Error(w, "CV wasn't find", http.StatusUnauthorized)
 		h.logg.Errorln(err)
 		return
 	}
@@ -261,7 +262,7 @@ func (h *Handlers) UserCV(w http.ResponseWriter, r *http.Request) {
 
 	id, err := getUserSession(r)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusForbidden)
+		http.Error(w, "CV wasn't find", http.StatusForbidden)
 		h.logg.Errorln(err)
 		return
 	}
@@ -273,17 +274,21 @@ func (h *Handlers) UserCV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	soft := []string{}
-	for _, sk := range searchCV.SoftSkills {
-		soft = append(soft, strings.Fields(sk)...)
+	if len(searchCV.SoftSkills) != 0 {
+		soft := []string{}
+		for _, sk := range searchCV.SoftSkills {
+			soft = append(soft, strings.Fields(sk)...)
+		}
+		searchCV.SoftSkills = soft
 	}
-	searchCV.SoftSkills = soft
 
-	hard := []string{}
-	for _, sk := range searchCV.HardSkills {
-		hard = append(hard, strings.Fields(sk)...)
+	if len(searchCV.HardSkills) != 0 {
+		hard := []string{}
+		for _, sk := range searchCV.HardSkills {
+			hard = append(hard, strings.Fields(sk)...)
+		}
+		searchCV.HardSkills = hard
 	}
-	searchCV.HardSkills = hard
 
 	viewHandler(w, "cv.html", searchCV)
 }
@@ -303,7 +308,7 @@ func (h *Handlers) DeleteCV(w http.ResponseWriter, r *http.Request) {
 
 	id, err := getUserSession(r)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusForbidden)
+		http.Error(w, "CV wasn't find", http.StatusForbidden)
 		h.logg.Errorln(err)
 		return
 	}
@@ -385,7 +390,7 @@ func (h *Handlers) DownLoadPDF(w http.ResponseWriter, r *http.Request) {
 
 	id, err := getUserSession(r)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusForbidden)
+		http.Error(w, "CV wasn't find", http.StatusForbidden)
 		h.logg.Errorln(err)
 		return
 	}
@@ -441,45 +446,43 @@ func (h *Handlers) DownLoadPDF(w http.ResponseWriter, r *http.Request) {
 	addText("Phone", cv.PhoneNumber)
 	addText("Education", cv.Education)
 
-	if len(cv.SoftSkills) != 0 {
-		pdf.SetFont("LiberationSans-Bold", "", 12)
-		pdf.SetX(float64(20))
-		pdf.SetY(float64(yPos))
-		pdf.Cell(nil, "Soft Skills:")
-		yPos += 15
+	pdf.SetFont("LiberationSans-Bold", "", 12)
+	pdf.SetX(float64(20))
+	pdf.SetY(float64(yPos))
+	pdf.Cell(nil, "Soft Skills:")
+	yPos += 15
 
-		soft := []string{}
-		for _, sk := range cv.SoftSkills {
-			soft = append(soft, strings.Fields(sk)...)
-		}
-
-		for _, skill := range soft {
-			pdf.SetX(30)
-			pdf.SetY(float64(yPos))
-			pdf.Cell(nil, "- "+skill)
-			yPos += 15
-		}
-		yPos += 25
+	soft := []string{}
+	for _, sk := range cv.SoftSkills {
+		soft = append(soft, strings.Fields(sk)...)
 	}
-	if len(cv.HardSkills) != 0 {
-		pdf.SetFont("LiberationSans-Bold", "", 12)
-		pdf.SetX(float64(20))
+
+	for _, skill := range soft {
+		pdf.SetX(30)
 		pdf.SetY(float64(yPos))
-		pdf.Cell(nil, "Hard Skills:")
+		pdf.Cell(nil, "- "+skill)
 		yPos += 15
-
-		hard := []string{}
-		for _, sk := range cv.HardSkills {
-			hard = append(hard, strings.Fields(sk)...)
-		}
-
-		for _, skill := range hard {
-			pdf.SetX(30)
-			pdf.SetY(float64(yPos))
-			pdf.Cell(nil, "- "+skill)
-			yPos += 15
-		}
 	}
+	yPos += 25
+
+	pdf.SetFont("LiberationSans-Bold", "", 12)
+	pdf.SetX(float64(20))
+	pdf.SetY(float64(yPos))
+	pdf.Cell(nil, "Hard Skills:")
+	yPos += 15
+
+	hard := []string{}
+	for _, sk := range cv.HardSkills {
+		hard = append(hard, strings.Fields(sk)...)
+	}
+
+	for _, skill := range hard {
+		pdf.SetX(30)
+		pdf.SetY(float64(yPos))
+		pdf.Cell(nil, "- "+skill)
+		yPos += 15
+	}
+
 	if cv.Description != "" {
 		yPos += 15
 		pdf.SetFont("LiberationSans-Bold", "", 12)

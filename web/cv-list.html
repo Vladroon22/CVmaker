@@ -127,6 +127,13 @@
             background-color: #d62828; 
         }
 
+        #sal {
+            width: 85%;
+        }
+        #currency {
+            width: 80px; 
+        }
+
         .download {
             text-align: right;
         }
@@ -199,7 +206,8 @@
             </div>
             <div class="input-group">
                 <label for="salary">Salary</label>
-                <input type="text" id="salary" name="salary" placeholder="Enter prefered salary" required>
+                <input type="text" id="sal" name="salary" placeholder="Enter prefered salary" required>
+                <input type="text" id="currency" name="currency" placeholder="Currency">
             </div>
             <div class="input-group">
                 <label for="city">City</label>
@@ -215,15 +223,15 @@
             </div>
             <div class="input-group">
                 <label for="hardskills">Hard Skills</label>
-                <input type="text" id="hardskills" name="hardskills" placeholder="example C/C++ Python etc...">
+                <input type="text" id="hardskills" name="hardskills" placeholder="example C/C++ Python etc..." required>
             </div>
             <div class="input-group">
                 <label for="softskills">Soft Skills</label>
-                <input type="text" id="softskills" name="softskills" placeholder="example Confident Smart etc...">
+                <input type="text" id="softskills" name="softskills" placeholder="example Confident Smart etc..." required>
             </div>
             <div class="input-group">
                 <label for="description">Description</label>
-                <input type="text" id="description" name="description" placeholder="Introduce youself">
+                <input type="text" id="description" name="description" placeholder="Introduce youself" required>
             </div>
             <button type="submit" class="btn">Create it</button> 
         </form>

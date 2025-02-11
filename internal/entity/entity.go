@@ -15,6 +15,7 @@ type CV struct {
 	EmailCV     string   `json:"emailcv"`
 	LivingCity  string   `json:"city"`
 	Salary      int      `json:"salary"`
+	Currency    string   `json:"currency"`
 	PhoneNumber string   `json:"phone"`
 	Education   string   `json:"education"`
 	SoftSkills  []string `json:"softskills"`
