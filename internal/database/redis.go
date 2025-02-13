@@ -20,6 +20,10 @@ func NewRedis(lg *golog.Logger, cnf *config.Config) *Redis {
 		DB:       0,
 	})
 
+	if err := client.Ping().Err(); err != nil {
+		panic("Failed to ping redis: " + err.Error())
+	}
+
 	return &Redis{
 		rd:     client,
 		logger: lg,

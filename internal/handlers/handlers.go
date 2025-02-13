@@ -315,15 +315,15 @@ func (h *Handlers) DeleteCV(w http.ResponseWriter, r *http.Request) {
 	h.logg.Infoln("prof: " + prof)
 
 	i := utils.BinSearchIndex(h.cvs, id, prof)
-	if i < 0 || i >= len(h.cvs) {
+	if i < 0 || i > len(h.cvs) {
 		http.Error(w, "no such profession", http.StatusBadRequest)
-		h.logg.Errorln("index out of range: ", i)
+		h.logg.Errorln("index out of range (BinSearchIndex): ", i)
 		return
 	}
 
 	if _, ok := h.cash[id]; ok {
 		delete(h.cash, id)
-		h.logg.Infoln("deleted element with ID: ", id, " from cache")
+		h.logg.Infoln("deleted element with from cache")
 	}
 
 	if len(h.cvs) == 1 {
@@ -333,8 +333,7 @@ func (h *Handlers) DeleteCV(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.red.Make("lrem", "jobs", i, prof)
-	h.logg.Infoln("deleted element with ID: ", id, " from redis at index: ", i)
-	h.logg.Infoln("index: ", i)
+	h.logg.Infoln("deleted element from redis at index: ", i)
 
 	http.Redirect(w, r, "/user/listCV", http.StatusSeeOther)
 	renderTemplate(w, "./web/cv-list.html", h.cvs)
