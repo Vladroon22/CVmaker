@@ -315,7 +315,7 @@ func (h *Handlers) DeleteCV(w http.ResponseWriter, r *http.Request) {
 	h.logg.Infoln("prof: " + prof)
 
 	i := utils.BinSearchIndex(h.cvs, id, prof)
-	if i < 0 || i > len(h.cvs) {
+	if i == -1 {
 		http.Error(w, "no such profession", http.StatusBadRequest)
 		h.logg.Errorln("index out of range (BinSearchIndex): ", i)
 		return
