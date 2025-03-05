@@ -7,24 +7,59 @@ sudo docker run --name=CV -e POSTGRES_PASSWORD=55555 -p 5433:5432 -d postgres:16
 sudo docker run --name=MyRedis -p 6379:6379 -d redis
 ```
 
-<h3>Export env variables</h3>
+<h3>Export env variables in .env file</h3>
 
 ```
-export DB="postgres:55555@localhost:5433/postgres?sslmode=disable" 
-export KEY="imagine your own secret key"
-export addr_port="localhost:your free port"
-export Redis="your free port"
+addr="localhost"
+port="8080"
+portS="8443"
+DB="postgres://postgres:55555@locahost:5433/postgres?sslmode=disable"
+Redis="6379"
+KEY="imagine your secret key"
+cert="cert.crt"
+keys="Key.key"
 ```
 
 <h2>How to run</h2>
-<h5>For SSL/TLS here used self-signed certificates<h5>
 
-``` HTTPS way: make run-ssl ```
+<h4>For SSL/TLS here used self-signed certificates<h4>
 
-``` HTTP way: make run ```
+<h5>HTTPS way
+
+```
+make ssl  
+```
+
+then 
+
+```
+make run 
+```
+
+<h5>HTTP way </h5>
+
+```
+make run 
+```
+
+<h5>Containerization way</h4>
+
+```
+make image
+```
+
+then
+
+```
+make docker
+```
 
 <h4>The app is hosted here now</h4>
 
 ```
-http://62.60.236.74:8080
+http://62.60.236.74:8080   
+```
+or
+```
+https://62.60.236.74:8443   
 ```
