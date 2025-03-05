@@ -35,11 +35,10 @@ type Handlers struct {
 	cash map[int]*ent.CV
 }
 
-func NewHandler(l *golog.Logger, s service.Servicer, rd *database.Redis) *Handlers {
+func NewHandler(l *golog.Logger, s service.Servicer) *Handlers {
 	return &Handlers{
 		logg: l,
 		srv:  s,
-		red:  rd,
 		cvs:  make([]ent.CV, 0),
 		cash: make(map[int]*ent.CV),
 	}

@@ -9,7 +9,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Vladroon22/CVmaker/config"
 	"github.com/Vladroon22/CVmaker/internal/database"
 	"github.com/Vladroon22/CVmaker/internal/handlers"
 	"github.com/Vladroon22/CVmaker/internal/repository"
@@ -17,26 +16,31 @@ import (
 	tlsserver "github.com/Vladroon22/CVmaker/internal/tls-server"
 	golog "github.com/Vladroon22/GoLog"
 	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
 )
 
 func main() {
-	cnf := config.CreateConfig()
 	logger := golog.New()
+
+	if err := godotenv.Load(); err != nil {
+		logger.Fatalln(err)
+	}
+
 	file, err := logger.SetOutput("logs.txt")
 	if err != nil {
 		logger.Fatalln(err)
 	}
 	defer file.Close()
 
-	conn, err := database.NewDB(cnf, logger).Connect(context.Background())
+	conn, err := database.NewDB(logger).Connect(context.Background())
 	if err != nil {
 		logger.Fatalln(err)
 	}
-	redis := database.NewRedis(logger, cnf)
+	redis := database.NewRedis(logger)
 
 	repo := repository.NewRepo(conn, logger, redis)
 	srv := service.NewService(repo)
-	h := handlers.NewHandler(logger, srv, redis)
+	h := handlers.NewHandler(logger, srv)
 
 	router := mux.NewRouter()
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("web"))))
@@ -55,7 +59,7 @@ func main() {
 	sub.HandleFunc("/listCV", h.ListCV).Methods("GET")
 	sub.HandleFunc("/downloadCV", h.DownLoadPDF).Methods("GET")
 
-	serv := tlsserver.New(cnf, logger)
+	serv := tlsserver.New(logger)
 	go func() {
 		if err := serv.Run(router); err != nil && err != http.ErrServerClosed {
 			logger.Fatalln(err)
@@ -66,7 +70,7 @@ func main() {
 	signal.Notify(exitSig, syscall.SIGINT, syscall.SIGTERM)
 	<-exitSig
 
-	wg := &sync.WaitGroup{}
+	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
 		defer wg.Done()

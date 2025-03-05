@@ -1,9 +1,9 @@
 package database
 
 import (
+	"os"
 	"time"
 
-	"github.com/Vladroon22/CVmaker/config"
 	golog "github.com/Vladroon22/GoLog"
 	"github.com/go-redis/redis"
 )
@@ -13,16 +13,14 @@ type Redis struct {
 	logger *golog.Logger
 }
 
-func NewRedis(lg *golog.Logger, cnf *config.Config) *Redis {
+func NewRedis(lg *golog.Logger) *Redis {
 	client := redis.NewClient(&redis.Options{
-		Addr:     "localhost:" + cnf.RedisPort,
+		Addr:     "localhost:" + os.Getenv("Redis"),
 		Password: "",
 		DB:       0,
 	})
 
-	if err := client.Ping().Err(); err != nil {
-		panic("Failed to ping redis: " + err.Error())
-	}
+	_ = client.Ping()
 
 	return &Redis{
 		rd:     client,

@@ -7,41 +7,38 @@ import (
 	"os"
 	"time"
 
-	"github.com/Vladroon22/CVmaker/config"
 	golog "github.com/Vladroon22/GoLog"
 	"github.com/gorilla/mux"
 )
 
 type Server struct {
-	conf   *config.Config
 	logger *golog.Logger
 	server *http.Server
 }
 
-func New(conf *config.Config, log *golog.Logger) *Server {
+func New(log *golog.Logger) *Server {
 	return &Server{
 		server: &http.Server{},
-		conf:   conf,
 		logger: log,
 	}
 }
 
 func (s *Server) Run(router *mux.Router) error {
-	certFile := "cert.crt"
-	keyFile := "Key.key"
+	certFile := os.Getenv("cert")
+	keyFile := os.Getenv("keys")
 
-	_, err1 := os.Stat(certFile)
-	_, err2 := os.Stat(keyFile)
+	_, errCert := os.Stat(certFile)
+	_, errKey := os.Stat(keyFile)
 
-	if os.IsNotExist(err1) || os.IsNotExist(err2) {
+	if os.IsNotExist(errCert) || os.IsNotExist(errKey) {
 		s.server = &http.Server{
-			Addr:           s.conf.Addr_PORT,
+			Addr:           os.Getenv("addr") + ":" + os.Getenv("port"),
 			Handler:        router,
 			MaxHeaderBytes: 1 << 20,
 			WriteTimeout:   15 * time.Second,
 			ReadTimeout:    15 * time.Second,
 		}
-		s.logger.Infoln("Server is listening --> http://", s.conf.Addr_PORT)
+		s.logger.Infoln("Server is listening --> http://", os.Getenv("addr")+":"+os.Getenv("port"))
 		return s.server.ListenAndServe()
 	}
 	certificate, err := tls.LoadX509KeyPair(certFile, keyFile)
@@ -51,14 +48,14 @@ func (s *Server) Run(router *mux.Router) error {
 
 	s.server = &http.Server{
 		TLSConfig:      &tls.Config{Certificates: []tls.Certificate{certificate}},
-		Addr:           s.conf.Addr_PORT,
+		Addr:           os.Getenv("addr") + ":" + os.Getenv("portS"),
 		Handler:        router,
 		MaxHeaderBytes: 1 << 20,
 		WriteTimeout:   15 * time.Second,
 		ReadTimeout:    15 * time.Second,
 	}
 
-	s.logger.Infoln("Server is listening --> https://", s.conf.Addr_PORT)
+	s.logger.Infoln("Server is listening --> https://", os.Getenv("addr")+":"+os.Getenv("portS"))
 	return s.server.ListenAndServeTLS(certFile, keyFile)
 }
 

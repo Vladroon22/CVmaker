@@ -2,27 +2,30 @@ package database
 
 import (
 	"context"
+	"os"
 	"time"
 
-	"github.com/Vladroon22/CVmaker/config"
 	golog "github.com/Vladroon22/GoLog"
 	pool "github.com/jackc/pgx/v5/pgxpool"
 )
 
 type DataBase struct {
 	logger *golog.Logger
-	config *config.Config
 }
 
-func NewDB(conf *config.Config, logg *golog.Logger) *DataBase {
+func NewDB(logg *golog.Logger) *DataBase {
 	return &DataBase{
-		config: conf,
 		logger: logg,
 	}
 }
 
 func (d *DataBase) Connect(ctx context.Context) (*pool.Pool, error) {
-	pool, err := pool.New(ctx, "postgres://"+d.config.DB)
+	dbURL := os.Getenv("DB")
+	if dbURL == "" {
+		d.logger.Fatalln("dbURL doesn't set")
+	}
+
+	pool, err := pool.New(ctx, dbURL)
 	if err != nil {
 		return nil, err
 	}
