@@ -11,17 +11,12 @@ run:
 	go build -o ./app cmd/main.go
 	./app
 
-make image:
-	sudo docker build . -t cvmaker
+compose-run:
+	sudo docker compose up -d
 
-make docker:
-	sudo docker network create my-net
-	sudo docker run --name=cvmake -p 8080:8080 --network my-net -d cvmaker
-	sudo docker run --name=CV -e POSTGRES_PASSWORD=55555 -e POSTGRES_DB=CV -p 5432:5432 --network my-net -d postgres:16.2
-	sudo docker run --name=MyRedis -p 6379:6379 --network my-net -d redis
+compose-stop:
+	sudo docker compose down
 
-make docker-rm:
-	sudo docker rm -f cvmake
-	sudo docker rm -f CV
-	sudo docker rm -f MyRedis
-	sudo docker network rm my-net
+compose-delete:
+	sudo docker compose down -v
+	sudo docker rmi cvmaker-cvmake

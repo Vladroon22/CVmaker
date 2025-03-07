@@ -30,9 +30,14 @@ func (s *Server) Run(router *mux.Router) error {
 	_, errCert := os.Stat(certFile)
 	_, errKey := os.Stat(keyFile)
 
+	addr := os.Getenv("addr")
+	if addr == "127.0.0.1" || addr == "0.0.0.0" {
+		addr = ""
+	}
+
 	if os.IsNotExist(errCert) || os.IsNotExist(errKey) {
 		s.server = &http.Server{
-			Addr:           os.Getenv("addr") + ":" + os.Getenv("port"),
+			Addr:           addr + ":" + os.Getenv("port"),
 			Handler:        router,
 			MaxHeaderBytes: 1 << 20,
 			WriteTimeout:   15 * time.Second,
