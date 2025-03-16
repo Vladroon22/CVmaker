@@ -20,6 +20,6 @@ COPY --from=builder /app/./app ./app
 #COPY --from=builder /app/Key.key ./Key.key
 
 EXPOSE 8080
-EXPOSE 8443
+#EXPOSE 8443
 
 CMD ["./app"]

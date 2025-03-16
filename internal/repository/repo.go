@@ -58,7 +58,7 @@ func (rp *Repo) Login(c context.Context, pass, email string) (int, error) {
 	return id, nil
 }
 
-func (rp *Repo) SaveSession(c context.Context, id int, ip, device string) error {
+func (rp *Repo) SaveSession(c context.Context, id int, device string) error {
 	ctx, cancel := context.WithCancel(c)
 	defer cancel()
 
@@ -90,8 +90,8 @@ func (rp *Repo) SaveSession(c context.Context, id int, ip, device string) error 
 		}
 	}
 
-	query3 := "INSERT INTO sessions (user_id, device_type, ip, created_at) VALUES ($1, $2, $3, $4)"
-	if _, err := tx.Exec(ctx, query3, id, device, ip, time.Now().UTC()); err != nil {
+	query3 := "INSERT INTO sessions (user_id, device_type, created_at) VALUES ($1, $2, $3)"
+	if _, err := tx.Exec(ctx, query3, id, device, time.Now().UTC()); err != nil {
 		rp.logg.Errorln("Tx to insert (session): ", errTx)
 		return errors.New("bad response from database")
 	}

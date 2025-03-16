@@ -111,7 +111,7 @@ func (h *Handlers) SignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.srv.SaveSession(r.Context(), id, r.RemoteAddr, device); err != nil {
+	if err := h.srv.SaveSession(r.Context(), id, device); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		h.logg.Errorln(err)
 		return

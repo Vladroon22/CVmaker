@@ -13,18 +13,21 @@ type Redis struct {
 	logger *golog.Logger
 }
 
-func NewRedis(lg *golog.Logger) *Redis {
+func NewRedis(logg *golog.Logger) *Redis {
 	client := redis.NewClient(&redis.Options{
-		Addr:     "localhost:" + os.Getenv("Redis"),
+		Addr:     "MyRedis" + ":" + os.Getenv("Redis"),
 		Password: "",
 		DB:       0,
 	})
 
-	_ = client.Ping()
+	if _, err := client.Ping().Result(); err != nil {
+		logg.Errorln(err)
+		return nil
+	}
 
 	return &Redis{
 		rd:     client,
-		logger: lg,
+		logger: logg,
 	}
 }
 
