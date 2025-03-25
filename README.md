@@ -45,13 +45,7 @@ make run
 <h5>Containerization way</h4>
 
 ```
-make image
-```
-
-then
-
-```
-make docker
+make compose-run
 ```
 
 <h4>The app is hosted here now</h4>

@@ -20,3 +20,5 @@ compose-stop:
 compose-delete:
 	sudo docker compose down -v
 	sudo docker rmi cvmaker-cvmake
+	sudo docker rmi postgres:16.2
+	sudo docker rmi redis
