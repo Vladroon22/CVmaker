@@ -57,7 +57,7 @@ func main() {
 	sub.HandleFunc("/makeCV", h.MakeCV).Methods("POST")
 	sub.HandleFunc("/profile", h.UserCV).Methods("GET")
 	sub.HandleFunc("/listCV", h.ListCV).Methods("GET")
-	sub.HandleFunc("/downloadCV", h.DownLoadPDF).Methods("GET")
+	sub.HandleFunc("/downloadCV", h.DownloadPDF).Methods("GET")
 
 	serv := tlsserver.New(logger)
 	go func() {

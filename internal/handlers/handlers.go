@@ -377,7 +377,7 @@ func (h *Handlers) EditCV(w http.ResponseWriter, r *http.Request) {
 	}
 }
 */
-func (h *Handlers) DownLoadPDF(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) DownloadPDF(w http.ResponseWriter, r *http.Request) {
 	profession := r.URL.Query().Get("profession")
 	h.logg.Infoln("Converting in pdf... ", profession)
 	if profession == "" {
@@ -388,7 +388,7 @@ func (h *Handlers) DownLoadPDF(w http.ResponseWriter, r *http.Request) {
 
 	id, err := getUserSession(r)
 	if err != nil {
-		http.Error(w, "CV wasn't find", http.StatusForbidden)
+		http.Error(w, "CV wasn't found", http.StatusForbidden)
 		h.logg.Errorln(err)
 		return
 	}
@@ -547,16 +547,16 @@ func clearCookie(w http.ResponseWriter, cookieName string) {
 	http.SetCookie(w, cookie)
 }
 
-func (h *Handlers) getUserCV(id int, prof string) (ent.CV, error) {
+func (h *Handlers) getUserCV(id int, prof string) (*ent.CV, error) {
 	searchCV, existed := utils.BinSearch(h.cvs, id, prof)
 	if !existed {
 		redisCV, err := h.srv.GetDataCV(prof)
 		if err != nil {
-			return ent.CV{}, err
+			return nil, err
 		}
 		searchCV = *redisCV
 	}
-	return searchCV, nil
+	return &searchCV, nil
 }
 
 func (h *Handlers) handleProfessions(Profs []string, id int) []ent.CV {
