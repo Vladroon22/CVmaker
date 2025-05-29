@@ -16,10 +16,10 @@ WORKDIR /app
 COPY --from=builder /app/web ./web
 COPY --from=builder /app/.env .env
 COPY --from=builder /app/./app ./app
-#COPY --from=builder /app/cert.crt ./cert.crt
-#COPY --from=builder /app/Key.key ./Key.key
+COPY --from=builder /app/cert.crt ./cert.crt
+COPY --from=builder /app/Key.key ./Key.key
 
 EXPOSE 8080
-#EXPOSE 8443
+EXPOSE 8443
 
 CMD ["./app"]
