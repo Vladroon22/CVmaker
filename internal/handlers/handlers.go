@@ -404,7 +404,7 @@ func (h *Handlers) DownloadPDF(w http.ResponseWriter, r *http.Request) {
 	pdf.Start(gopdf.Config{PageSize: *gopdf.PageSizeA4})
 	pdf.AddPage()
 
-	if err := pdf.AddTTFFont("LiberationSans-Bold", "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"); err != nil {
+	if err := pdf.AddTTFFont("LiberationSans-Bold", "./LiberationSans-Bold.ttf"); err != nil {
 		http.Error(w, "Error of creating pdf-file", http.StatusInternalServerError)
 		h.logg.Errorln(err)
 		return

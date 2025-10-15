@@ -18,6 +18,7 @@ COPY --from=builder /app/.env .env
 COPY --from=builder /app/./app ./app
 COPY --from=builder /app/cert.crt ./cert.crt
 COPY --from=builder /app/Key.key ./Key.key
+COPY --from=builder /app/LiberationSans-Bold.ttf ./LiberationSans-Bold.ttf
 
 EXPOSE 8080
 EXPOSE 8443

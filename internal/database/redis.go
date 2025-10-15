@@ -15,7 +15,7 @@ type Redis struct {
 
 func NewRedis(logg *golog.Logger) *Redis {
 	client := redis.NewClient(&redis.Options{
-		Addr:     os.Getenv("Redis") + ":" + os.Getenv("RedisPort"),
+		Addr:     "MyRedis" + ":" + os.Getenv("Redis"),
 		Password: "",
 		DB:       0,
 	})

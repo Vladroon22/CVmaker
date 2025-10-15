@@ -40,7 +40,7 @@ func (s *Server) Run(router *mux.Router) error {
 			WriteTimeout:   15 * time.Second,
 			ReadTimeout:    15 * time.Second,
 		}
-		s.logger.Infoln("Server is listening --> http://", addr+":"+os.Getenv("port"))
+		s.logger.Infoln("Server is listening --> http://", os.Getenv("addr")+":"+os.Getenv("port"))
 		return s.server.ListenAndServe()
 	}
 	certificate, err := tls.LoadX509KeyPair(certFile, keyFile)
@@ -50,14 +50,14 @@ func (s *Server) Run(router *mux.Router) error {
 
 	s.server = &http.Server{
 		TLSConfig:      &tls.Config{Certificates: []tls.Certificate{certificate}},
-		Addr:           addr + ":" + os.Getenv("portS"),
+		Addr:           os.Getenv("addr") + ":" + os.Getenv("portS"),
 		Handler:        router,
 		MaxHeaderBytes: 1 << 20,
 		WriteTimeout:   15 * time.Second,
 		ReadTimeout:    15 * time.Second,
 	}
 
-	s.logger.Infoln("Server is listening --> https://", addr+":"+os.Getenv("portS"))
+	s.logger.Infoln("Server is listening --> https://", os.Getenv("addr")+":"+os.Getenv("portS"))
 	return s.server.ListenAndServeTLS(certFile, keyFile)
 }
 
