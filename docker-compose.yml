@@ -2,7 +2,7 @@ services:
   cvmake:
     build: ./
     ports:
-      - "-:8443:8443"
+      - "8080:8080"
     depends_on:
       - postgres
       - redis
@@ -14,7 +14,7 @@ services:
       POSTGRES_PASSWORD: 63455
       POSTGRES_DB: CV
     ports:
-      - "5434:5432"
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -22,7 +22,7 @@ services:
     image: redis
     container_name: MyRedis
     ports:
-      - "6377:6379"
+      - "6379:6379"
 
 volumes:
   postgres_data:

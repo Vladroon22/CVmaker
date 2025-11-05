@@ -15,15 +15,11 @@ type Redis struct {
 
 func NewRedis(logg *golog.Logger) *Redis {
 	client := redis.NewClient(&redis.Options{
-		Addr:     "MyRedis" + ":" + os.Getenv("Redis"),
+		Addr:     os.Getenv("Redis") + ":" + os.Getenv("RedisPort"),
 		Password: "",
 		DB:       0,
 	})
 
-	if _, err := client.Ping().Result(); err != nil {
-		logg.Errorln(err)
-		return nil
-	}
 	logg.Infoln("Redis configurated")
 
 	return &Redis{

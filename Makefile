@@ -2,7 +2,7 @@
 
 ssl:
 	openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 -keyout Key.key -out cert.crt
-clean:
+clean-ssl:
 	rm cert.crt
 	rm Key.key
 
@@ -11,13 +11,13 @@ run:
 	./app
 
 compose-run:
-	docker compose up --build -d
+	sudo docker-compose up --build -d
 
 compose-stop:
-	docker compose down
+	sudo docker-compose down
 
 compose-delete:
-	docker compose down -v
-	docker rmi cvmaker-cvmake
-	docker rmi postgres:16
-	docker rmi redis
+	sudo docker-compose down -v
+	sudo docker rmi cvmaker_cvmake
+	sudo docker rmi postgres:16
+	sudo docker rmi redis

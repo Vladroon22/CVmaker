@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -345,12 +346,14 @@ func (h *Handlers) AuthMiddleWare(next http.Handler) http.Handler {
 		if err == http.ErrNoCookie {
 			http.Error(w, "Session expired", http.StatusUnauthorized)
 			h.logg.Errorln("Session expired: ", err)
+			http.Redirect(w, r, "/", http.StatusMovedPermanently)
 			return
 		}
 		claims, err := auth.ValidateJWT(cookieJWT.Value)
 		if err != nil {
 			http.Error(w, "Invalid JWT", http.StatusUnauthorized)
 			h.logg.Errorln("Invalid JWT: ", err)
+			http.Redirect(w, r, "/", http.StatusMovedPermanently)
 			return
 		}
 		ctx := context.WithValue(r.Context(), ID, claims.UserID)
@@ -404,13 +407,14 @@ func (h *Handlers) DownloadPDF(w http.ResponseWriter, r *http.Request) {
 	pdf.Start(gopdf.Config{PageSize: *gopdf.PageSizeA4})
 	pdf.AddPage()
 
-	if err := pdf.AddTTFFont("LiberationSans-Bold", "./LiberationSans-Bold.ttf"); err != nil {
+	family := os.Getenv("family")
+	if err := pdf.AddTTFFont(family, os.Getenv("ttfpath")); err != nil {
 		http.Error(w, "Error of creating pdf-file", http.StatusInternalServerError)
 		h.logg.Errorln(err)
 		return
 	}
 
-	if err := pdf.SetFont("LiberationSans-Bold", "", 12); err != nil {
+	if err := pdf.SetFont(family, "", 12); err != nil {
 		http.Error(w, "Error of creating pdf-file", http.StatusInternalServerError)
 		h.logg.Errorln(err)
 		return
@@ -420,7 +424,7 @@ func (h *Handlers) DownloadPDF(w http.ResponseWriter, r *http.Request) {
 	lineHeight := 27
 
 	addTitle := func(text string) {
-		pdf.SetFont("LiberationSans-Bold", "", 16)
+		pdf.SetFont(family, "", 16)
 		pdf.SetX(230)
 		pdf.SetY(float64(yPos))
 		pdf.Cell(nil, text)
@@ -428,7 +432,7 @@ func (h *Handlers) DownloadPDF(w http.ResponseWriter, r *http.Request) {
 	}
 
 	addText := func(label, value string) {
-		pdf.SetFont("LiberationSans-Bold", "", 12)
+		pdf.SetFont(family, "", 12)
 		pdf.SetX(20)
 		pdf.SetY(float64(yPos))
 		pdf.Cell(nil, label+": "+value)
@@ -443,11 +447,6 @@ func (h *Handlers) DownloadPDF(w http.ResponseWriter, r *http.Request) {
 	addText("Email", cv.EmailCV)
 	addText("Phone", cv.PhoneNumber)
 	addText("Education", cv.Education)
-
-	pdf.SetFont("LiberationSans-Bold", "", 12)
-	pdf.SetX(float64(20))
-	pdf.SetY(float64(yPos))
-	pdf.Cell(nil, "Soft Skills:")
 	yPos += 15
 
 	soft := []string{}
@@ -455,15 +454,22 @@ func (h *Handlers) DownloadPDF(w http.ResponseWriter, r *http.Request) {
 		soft = append(soft, strings.Fields(sk)...)
 	}
 
-	for _, skill := range soft {
-		pdf.SetX(30)
+	if len(soft) > 0 {
+		pdf.SetFont(family, "", 12)
+		pdf.SetX(float64(20))
 		pdf.SetY(float64(yPos))
-		pdf.Cell(nil, "- "+skill)
-		yPos += 15
-	}
-	yPos += 25
+		pdf.Cell(nil, "Soft Skills:")
 
-	pdf.SetFont("LiberationSans-Bold", "", 12)
+		for _, skill := range soft {
+			pdf.SetX(30)
+			pdf.SetY(float64(yPos))
+			pdf.Cell(nil, "- "+skill)
+			yPos += 15
+		}
+		yPos += 25
+	}
+
+	pdf.SetFont(family, "", 12)
 	pdf.SetX(float64(20))
 	pdf.SetY(float64(yPos))
 	pdf.Cell(nil, "Hard Skills:")
@@ -483,13 +489,13 @@ func (h *Handlers) DownloadPDF(w http.ResponseWriter, r *http.Request) {
 
 	if cv.Description != "" {
 		yPos += 15
-		pdf.SetFont("LiberationSans-Bold", "", 12)
+		pdf.SetFont(family, "", 12)
 		pdf.SetX(float64(280))
 		pdf.SetY(float64(yPos))
 		pdf.Cell(nil, "Brief")
 
 		yPos += 20
-		pdf.SetFont("LiberationSans-Bold", "", 12)
+		pdf.SetFont(family, "", 12)
 		pdf.SetX(float64(20))
 		pdf.SetY(float64(yPos))
 		pdf.Cell(nil, cv.Description)
