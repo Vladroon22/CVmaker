@@ -3,10 +3,6 @@ package main
 import (
 	"context"
 	"net/http"
-	"os"
-	"os/signal"
-	"sync"
-	"syscall"
 	"time"
 
 	"github.com/Vladroon22/CVmaker/internal/database"
@@ -60,31 +56,23 @@ func main() {
 	sub.HandleFunc("/downloadCV", h.DownloadPDF).Methods("GET")
 
 	serv := tlsserver.New(logger)
-	go func() {
-		if err := serv.Run(router); err != nil && err != http.ErrServerClosed {
-			logger.Fatalln(err)
-		}
-	}()
 
-	exitSig := make(chan os.Signal, 1)
-	signal.Notify(exitSig, syscall.SIGINT, syscall.SIGTERM)
-	<-exitSig
+	go serv.Run(router)
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	select {
+	case err := <-serv.StopServerChan:
+		logger.Fatalf("Server error: %v", err)
+		close(serv.StopServerChan)
+	case sig := <-serv.StopOSChan:
+		logger.Infof("Received %v signal, shutting down...", sig)
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()
 
 		if err := serv.Shutdown(ctx); err != nil {
-			logger.Errorln(err)
+			logger.Infof("HTTP server shutdown error: %v", err)
 		}
-
-		conn.Close()
-	}()
-	wg.Wait()
+	}
 
 	logger.Infoln("Gracefull shutdown")
 }

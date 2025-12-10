@@ -47,13 +47,3 @@ make run
 ```
 make compose-run
 ```
-
-<h4>The app is hosted here now</h4>
-
-```
-http://62.60.236.74:8080   
-```
-or
-```
-https://62.60.236.74:8443   
-```

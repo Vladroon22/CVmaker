@@ -129,9 +129,10 @@ func (h *Handlers) SignIn(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/user/listCV", http.StatusSeeOther)
 }
 
-func (h *Handlers) parseCVForm(r *http.Request) (*ent.CV, error) {
+func (h *Handlers) parseCVForm(w http.ResponseWriter, r *http.Request) (*ent.CV, error) {
 	id, err := getUserSession(r)
 	if err != nil {
+		http.Redirect(w, r, "/", http.StatusMovedPermanently)
 		h.logg.Errorln(err)
 		return nil, errors.New("CV wasn't find")
 	}
@@ -188,12 +189,18 @@ func (h *Handlers) parseCVForm(r *http.Request) (*ent.CV, error) {
 }
 
 func (h *Handlers) MakeCV(w http.ResponseWriter, r *http.Request) {
+	if _, err := getUserSession(r); err != nil {
+		http.Redirect(w, r, "/", http.StatusMovedPermanently)
+		h.logg.Errorln(err)
+		return
+	}
+
 	if err := h.checkValidRequest(w, r); err != nil {
 		h.logg.Errorln(err)
 		return
 	}
 
-	parsedCV, err := h.parseCVForm(r)
+	parsedCV, err := h.parseCVForm(w, r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -210,7 +217,7 @@ func (h *Handlers) MakeCV(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) ListCV(w http.ResponseWriter, r *http.Request) {
 	id, err := getUserSession(r)
 	if err != nil {
-		http.Error(w, "CV wasn't find", http.StatusUnauthorized)
+		http.Redirect(w, r, "/", http.StatusMovedPermanently)
 		h.logg.Errorln(err)
 		return
 	}
@@ -253,17 +260,17 @@ func renderTemplate(w http.ResponseWriter, templateFile string, data interface{}
 }
 
 func (h *Handlers) UserCV(w http.ResponseWriter, r *http.Request) {
+	id, err := getUserSession(r)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusMovedPermanently)
+		h.logg.Errorln(err)
+		return
+	}
+
 	prof := r.URL.Query().Get("profession")
 	if prof == "" {
 		http.Error(w, "Profession not provided", http.StatusBadRequest)
 		h.logg.Errorln("Profession not provided")
-		return
-	}
-
-	id, err := getUserSession(r)
-	if err != nil {
-		http.Error(w, "CV wasn't find", http.StatusForbidden)
-		h.logg.Errorln(err)
 		return
 	}
 
@@ -299,6 +306,13 @@ func (h *Handlers) LogOut(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) DeleteCV(w http.ResponseWriter, r *http.Request) {
+	id, err := getUserSession(r)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusMovedPermanently)
+		h.logg.Errorln(err)
+		return
+	}
+
 	prof := r.URL.Query().Get("profession")
 	if prof == "" {
 		http.Error(w, "Profession not provided", http.StatusBadRequest)
@@ -306,12 +320,6 @@ func (h *Handlers) DeleteCV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := getUserSession(r)
-	if err != nil {
-		http.Error(w, "CV wasn't find", http.StatusForbidden)
-		h.logg.Errorln(err)
-		return
-	}
 	h.logg.Infoln("prof: " + prof)
 
 	i := utils.BinSearchIndex(h.cvs, id, prof)
@@ -381,18 +389,18 @@ func (h *Handlers) EditCV(w http.ResponseWriter, r *http.Request) {
 }
 */
 func (h *Handlers) DownloadPDF(w http.ResponseWriter, r *http.Request) {
+	id, err := getUserSession(r)
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusMovedPermanently)
+		h.logg.Errorln(err)
+		return
+	}
+
 	profession := r.URL.Query().Get("profession")
 	h.logg.Infoln("Converting in pdf... ", profession)
 	if profession == "" {
 		http.Error(w, "profession provided", http.StatusBadRequest)
 		h.logg.Errorln("profession not provided")
-		return
-	}
-
-	id, err := getUserSession(r)
-	if err != nil {
-		http.Error(w, "CV wasn't found", http.StatusForbidden)
-		h.logg.Errorln(err)
 		return
 	}
 

@@ -5,6 +5,8 @@ import (
 	"crypto/tls"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	golog "github.com/Vladroon22/GoLog"
@@ -12,18 +14,24 @@ import (
 )
 
 type Server struct {
-	logger *golog.Logger
-	server *http.Server
+	logger         *golog.Logger
+	server         *http.Server
+	StopOSChan     chan os.Signal
+	StopServerChan chan error
 }
 
 func New(log *golog.Logger) *Server {
 	return &Server{
-		server: &http.Server{},
-		logger: log,
+		server:         &http.Server{},
+		logger:         log,
+		StopOSChan:     make(chan os.Signal, 1),
+		StopServerChan: make(chan error, 1),
 	}
 }
 
 func (s *Server) Run(router *mux.Router) error {
+	signal.Notify(s.StopOSChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+
 	certFile := os.Getenv("cert")
 	keyFile := os.Getenv("keys")
 
@@ -45,7 +53,7 @@ func (s *Server) Run(router *mux.Router) error {
 	}
 	certificate, err := tls.LoadX509KeyPair(certFile, keyFile)
 	if err != nil {
-		s.logger.Fatalln(err)
+		s.StopServerChan <- err
 	}
 
 	s.server = &http.Server{
