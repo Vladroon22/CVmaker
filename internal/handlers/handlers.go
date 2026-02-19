@@ -462,20 +462,19 @@ func (h *Handlers) DownloadPDF(w http.ResponseWriter, r *http.Request) {
 		soft = append(soft, strings.Fields(sk)...)
 	}
 
-	if len(soft) > 0 {
-		pdf.SetFont(family, "", 12)
-		pdf.SetX(float64(20))
-		pdf.SetY(float64(yPos))
-		pdf.Cell(nil, "Soft Skills:")
+	pdf.SetFont(family, "", 12)
+	pdf.SetX(float64(20))
+	pdf.SetY(float64(yPos))
+	pdf.Cell(nil, "Soft Skills:")
+	yPos += 15
 
-		for _, skill := range soft {
-			pdf.SetX(30)
-			pdf.SetY(float64(yPos))
-			pdf.Cell(nil, "- "+skill)
-			yPos += 15
-		}
-		yPos += 25
+	for _, skill := range soft {
+		pdf.SetX(30)
+		pdf.SetY(float64(yPos))
+		pdf.Cell(nil, "- "+skill)
+		yPos += 15
 	}
+	yPos += 25
 
 	pdf.SetFont(family, "", 12)
 	pdf.SetX(float64(20))
@@ -495,10 +494,22 @@ func (h *Handlers) DownloadPDF(w http.ResponseWriter, r *http.Request) {
 		yPos += 15
 	}
 
+	processed := func(word string, index int, totalWords int) string {
+		if strings.Contains(word, ".") || (index+1)%30 == 0 && index != totalWords-1 {
+			return word + "\n"
+		}
+
+		if index != totalWords-1 {
+			return word + " "
+		}
+
+		return word
+	}
+
 	if cv.Description != "" {
 		yPos += 15
 		pdf.SetFont(family, "", 12)
-		pdf.SetX(float64(280))
+		pdf.SetX(float64(30))
 		pdf.SetY(float64(yPos))
 		pdf.Cell(nil, "Brief")
 
@@ -506,7 +517,13 @@ func (h *Handlers) DownloadPDF(w http.ResponseWriter, r *http.Request) {
 		pdf.SetFont(family, "", 12)
 		pdf.SetX(float64(20))
 		pdf.SetY(float64(yPos))
-		pdf.Cell(nil, cv.Description)
+
+		words := strings.Split(cv.Description, " ")
+
+		for i, word := range words {
+			pdf.Cell(nil, processed(word, i, len(words)))
+		}
+
 	}
 	w.Header().Set("Content-Type", "application/pdf")
 	w.Header().Set("Content-Disposition", "attachment; filename=CV.pdf")
