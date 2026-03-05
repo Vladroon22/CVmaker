@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	TTLofJWT = time.Minute * 10
+	TTLofJWT = time.Minute * 40
 	TTLofCV  = time.Hour * 24 * 7
 )
 
