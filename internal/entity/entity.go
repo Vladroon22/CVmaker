@@ -1,4 +1,4 @@
-package service
+package entity
 
 type UserInput struct {
 	Name     string `json:"username"`
