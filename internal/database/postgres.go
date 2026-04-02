@@ -2,35 +2,37 @@ package database
 
 import (
 	"context"
+	"log"
 	"os"
 	"time"
 
-	golog "github.com/Vladroon22/GoLog"
 	pool "github.com/jackc/pgx/v5/pgxpool"
 )
 
 type DataBase struct {
-	logger *golog.Logger
+	pool *pool.Pool
 }
 
-func NewDB(logg *golog.Logger) *DataBase {
-	return &DataBase{
-		logger: logg,
-	}
+func NewDB() *DataBase {
+	return &DataBase{}
 }
 
-func (d *DataBase) Connect(ctx context.Context) (*pool.Pool, error) {
+func (d *DataBase) GetPool() *pool.Pool {
+	return d.pool
+}
+
+func (d *DataBase) Connect(ctx context.Context) error {
 	dbURL := os.Getenv("DB")
 	if dbURL == "" {
-		d.logger.Fatalln("dbURL doesn't set")
+		log.Fatalln("dbURL doesn't set")
 	}
 
 	pool, err := pool.New(ctx, dbURL)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if err := ping(ctx, pool); err != nil {
-		return nil, err
+		return err
 	}
 
 	schema := `
@@ -53,9 +55,10 @@ func (d *DataBase) Connect(ctx context.Context) (*pool.Pool, error) {
 	if _, err := pool.Exec(ctx, schema); err != nil {
 		panic("Error creating migrations:" + err.Error())
 	}
+	d.pool = pool
 
-	d.logger.Infoln("Database connection is valid")
-	return pool, nil
+	log.Println("Database connection is valid")
+	return nil
 }
 
 func ping(c context.Context, cn *pool.Pool) error {
@@ -69,4 +72,8 @@ func ping(c context.Context, cn *pool.Pool) error {
 		time.Sleep(time.Millisecond * 500)
 	}
 	return err
+}
+
+func (d *DataBase) Close() {
+	d.pool.Close()
 }

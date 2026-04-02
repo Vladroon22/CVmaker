@@ -14,7 +14,7 @@ compose-run:
 	sudo docker-compose up --build -d
 
 compose-stop:
-	sudo docker-compose down
+	sudo docker-compose down -v
 
 compose-delete:
 	sudo docker-compose down -v

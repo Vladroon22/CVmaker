@@ -3,27 +3,25 @@ package tlsserver
 import (
 	"context"
 	"crypto/tls"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	golog "github.com/Vladroon22/GoLog"
 	"github.com/gorilla/mux"
 )
 
 type Server struct {
-	logger         *golog.Logger
 	server         *http.Server
 	StopOSChan     chan os.Signal
 	StopServerChan chan error
 }
 
-func New(log *golog.Logger) *Server {
+func New() *Server {
 	return &Server{
 		server:         &http.Server{},
-		logger:         log,
 		StopOSChan:     make(chan os.Signal, 1),
 		StopServerChan: make(chan error, 1),
 	}
@@ -48,7 +46,7 @@ func (s *Server) Run(router *mux.Router) error {
 			WriteTimeout:   15 * time.Second,
 			ReadTimeout:    15 * time.Second,
 		}
-		s.logger.Infoln("Server is listening --> http://", os.Getenv("addr")+":"+os.Getenv("port"))
+		log.Printf("Server is listening --> http://%s:%s", os.Getenv("addr"), os.Getenv("port"))
 		return s.server.ListenAndServe()
 	}
 	certificate, err := tls.LoadX509KeyPair(certFile, keyFile)
@@ -65,7 +63,7 @@ func (s *Server) Run(router *mux.Router) error {
 		ReadTimeout:    15 * time.Second,
 	}
 
-	s.logger.Infoln("Server is listening --> https://", os.Getenv("addr")+":"+os.Getenv("portS"))
+	log.Printf("Server is listening --> https://%s:%s", os.Getenv("addr"), os.Getenv("portS"))
 	return s.server.ListenAndServeTLS(certFile, keyFile)
 }
 

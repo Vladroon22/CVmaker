@@ -4,7 +4,6 @@ import (
 	"errors"
 	"os"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 
@@ -94,36 +93,4 @@ func Valid(user *ent.UserInput) error {
 		return errors.New("name is too long")
 	}
 	return nil
-}
-
-func BinSearch(cvs []ent.CV, goal int, prof string) (ent.CV, bool) {
-	if len(cvs) == 0 {
-		return ent.CV{}, false
-	}
-
-	sort.Slice(cvs, func(i, j int) bool { return cvs[i].ID < cvs[j].ID })
-
-	beg := 0
-	end := len(cvs) - 1
-
-	for beg <= end {
-		mid := beg + (end-beg)/2
-		if cvs[mid].ID == goal && cvs[mid].Profession == prof {
-			return cvs[mid], true
-		} else if cvs[mid].ID < goal {
-			beg = mid + 1
-		} else {
-			end = mid - 1
-		}
-	}
-	return ent.CV{}, false
-}
-
-func BinSearchIndex(cvs []ent.CV, id int, prof string) int {
-	sort.Slice(cvs, func(i, j int) bool { return cvs[i].ID < cvs[j].ID })
-	i := sort.Search(len(cvs), func(i int) bool { return cvs[i].ID == id && cvs[i].Profession == prof })
-	if i < 0 || i > len(cvs) && cvs[i].Profession == prof {
-		return i
-	}
-	return -1
 }

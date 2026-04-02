@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"time"
 
@@ -10,33 +11,24 @@ import (
 	"github.com/Vladroon22/CVmaker/internal/repository"
 	"github.com/Vladroon22/CVmaker/internal/service"
 	tlsserver "github.com/Vladroon22/CVmaker/internal/tls-server"
-	golog "github.com/Vladroon22/GoLog"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 )
 
 func main() {
-	logger := golog.New()
-
 	if err := godotenv.Load(); err != nil {
-		logger.Fatalln(err)
+		log.Fatalln(err)
 	}
 
-	file, err := logger.SetOutput("logs.txt")
-	if err != nil {
-		logger.Fatalln(err)
+	db := database.NewDB()
+	if err := db.Connect(context.Background()); err != nil {
+		log.Fatalln(err)
 	}
-	defer file.Close()
+	redis := database.NewRedis()
 
-	conn, err := database.NewDB(logger).Connect(context.Background())
-	if err != nil {
-		logger.Fatalln(err)
-	}
-	redis := database.NewRedis(logger)
-
-	repo := repository.NewRepo(conn, logger, redis)
+	repo := repository.NewRepo(db, redis)
 	srv := service.NewService(repo)
-	h := handlers.NewHandler(logger, srv)
+	h := handlers.NewHandler(srv)
 
 	router := mux.NewRouter()
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("web"))))
@@ -55,24 +47,26 @@ func main() {
 	sub.HandleFunc("/listCV", h.ListCV).Methods("GET")
 	sub.HandleFunc("/downloadCV", h.DownloadPDF).Methods("GET")
 
-	serv := tlsserver.New(logger)
+	serv := tlsserver.New()
 
 	go serv.Run(router)
 
 	select {
 	case err := <-serv.StopServerChan:
-		logger.Fatalf("Server error: %v", err)
+		log.Fatalf("Server error: %v", err)
 		close(serv.StopServerChan)
 	case sig := <-serv.StopOSChan:
-		logger.Infof("Received %v signal, shutting down...", sig)
+		log.Printf("Received %s, shutting down...\n", sig.String())
 
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()
 
+		db.Close()
+
 		if err := serv.Shutdown(ctx); err != nil {
-			logger.Infof("HTTP server shutdown error: %v", err)
+			log.Printf("HTTP server shutdown error: %v", err)
 		}
 	}
 
-	logger.Infoln("Gracefull shutdown")
+	log.Println("Gracefull shutdown")
 }

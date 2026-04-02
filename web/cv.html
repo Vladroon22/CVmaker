@@ -35,7 +35,7 @@
     </style>
 </head>
 <body>
-    <h1>{{.Name}} {{.Surname}}'s CV</h1>
+    <h1>{{.Name}} {{.Surname}}</h1>
     <p><strong>Age:</strong> {{.Age}}</p>
     <p><strong>Profession:</strong> {{.Profession}}</p>
     <p><strong>Living City:</strong> {{.LivingCity}}</p>
@@ -66,9 +66,7 @@
         <form action="/user/listCV" method="get">
             <button id="logoutButton">Back to CVs</button>
         </form>
-    </div>
-
-    <div class="ex">
+    
         <form action="/logout" method="get">
             <button id="logoutButton">Log Out</button>
         </form>

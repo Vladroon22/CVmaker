@@ -1,5 +1,7 @@
 package entity
 
+import "time"
+
 type UserInput struct {
 	Name     string `json:"username"`
 	Email    string `json:"email"`
@@ -21,4 +23,5 @@ type CV struct {
 	SoftSkills  []string `json:"softskills"`
 	HardSkills  []string `json:"hardskills"`
 	Description string   `json:"decription"`
+	Exp         time.Time
 }

@@ -1,31 +1,27 @@
 package database
 
 import (
+	"log"
 	"os"
 	"time"
 
-	golog "github.com/Vladroon22/GoLog"
 	"github.com/go-redis/redis"
 )
 
 type Redis struct {
-	rd     *redis.Client
-	logger *golog.Logger
+	rd *redis.Client
 }
 
-func NewRedis(logg *golog.Logger) *Redis {
+func NewRedis() *Redis {
 	client := redis.NewClient(&redis.Options{
 		Addr:     os.Getenv("Redis") + ":" + os.Getenv("RedisPort"),
 		Password: "",
 		DB:       0,
 	})
 
-	logg.Infoln("Redis configurated")
+	log.Println("Redis configurated")
 
-	return &Redis{
-		rd:     client,
-		logger: logg,
-	}
+	return &Redis{client}
 }
 
 func (r *Redis) SetData(item string, data interface{}, expTime time.Duration) error {
@@ -47,6 +43,25 @@ func (r *Redis) Make(a ...interface{}) {
 	r.rd.Do(a...).Result()
 }
 
-func (r *Redis) Iterate() ([]string, error) {
-	return r.rd.LRange("jobs", 0, -1).Result()
+func (r *Redis) IterateWithPattern(pattern string) ([]string, error) {
+	var keys []string
+	var cursor uint64
+
+	for {
+		var batch []string
+		var err error
+
+		batch, cursor, err = r.rd.Scan(cursor, pattern, 20).Result()
+		if err != nil {
+			return nil, err
+		}
+
+		keys = append(keys, batch...)
+
+		if cursor == 0 {
+			break
+		}
+	}
+
+	return keys, nil
 }

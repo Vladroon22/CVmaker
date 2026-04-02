@@ -27,13 +27,7 @@ keys="Key.key"
 <h5>HTTPS way
 
 ```
-make ssl  
-```
-
-then 
-
-```
-make run 
+make ssl & make run 
 ```
 
 <h5>HTTP way </h5>
@@ -45,5 +39,5 @@ make run
 <h5>Containerization way</h4>
 
 ```
-make compose-run
+make ssl & make compose-run
 ```
