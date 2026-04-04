@@ -73,6 +73,7 @@ func (c *Cache) Delete(prof string, id int) {
 	for _, cv := range c.cache[id] {
 		if cv.Profession == prof {
 			delete(c.cache, id)
+			return
 		}
 	}
 }
