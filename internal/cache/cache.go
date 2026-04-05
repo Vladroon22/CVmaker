@@ -9,13 +9,13 @@ import (
 )
 
 type Cache struct {
-	cache map[int][]*ent.CV
+	cache map[string][]*ent.CV
 	mtx   sync.RWMutex
 }
 
 func InitCache() *Cache {
 	chc := &Cache{
-		cache: make(map[int][]*ent.CV),
+		cache: make(map[string][]*ent.CV),
 		mtx:   sync.RWMutex{},
 	}
 
@@ -24,12 +24,12 @@ func InitCache() *Cache {
 	return chc
 }
 
-func (c *Cache) Set(id int, cv *ent.CV) {
+func (c *Cache) Set(id string, cv *ent.CV) {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 
 	if c.cache == nil {
-		c.cache = make(map[int][]*ent.CV)
+		c.cache = make(map[string][]*ent.CV)
 	}
 
 	cv.Exp = time.Now().Add(20 * time.Minute)
@@ -37,21 +37,21 @@ func (c *Cache) Set(id int, cv *ent.CV) {
 	c.cache[id] = append(c.cache[id], cv)
 }
 
-func (c *Cache) GetLen(id int) int {
+func (c *Cache) GetLen(id string) int {
 	c.mtx.RLock()
 	defer c.mtx.RUnlock()
 
 	return len(c.cache[id])
 }
 
-func (c *Cache) Get(prof string, id int) (*ent.CV, bool) {
+func (c *Cache) Get(prof, id string) (*ent.CV, bool) {
 	c.mtx.RLock()
 	defer c.mtx.RUnlock()
 
 	return binSearch(c.cache[id], id, prof)
 }
 
-func (c *Cache) FromToSliceByID(id int) []ent.CV {
+func (c *Cache) FromToSliceByID(id string) []ent.CV {
 	c.mtx.RLock()
 	defer c.mtx.RUnlock()
 
@@ -66,7 +66,7 @@ func (c *Cache) FromToSliceByID(id int) []ent.CV {
 	return cvs
 }
 
-func (c *Cache) Delete(prof string, id int) {
+func (c *Cache) Delete(prof, id string) {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 
@@ -110,7 +110,7 @@ func (c *Cache) cleanExpired() {
 	}
 }
 
-func binSearch(cvs []*ent.CV, goal int, prof string) (*ent.CV, bool) {
+func binSearch(cvs []*ent.CV, goal string, prof string) (*ent.CV, bool) {
 	if len(cvs) == 0 {
 		return nil, false
 	}

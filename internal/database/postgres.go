@@ -37,16 +37,16 @@ func (d *DataBase) Connect(ctx context.Context) error {
 
 	schema := `
 	CREATE TABLE IF NOT EXISTS users (
-		id SERIAL PRIMARY KEY,
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 		name VARCHAR(20),
 		hash_password VARCHAR(70) NOT NULL,
-		email VARCHAR(30) NOT NULL,
+		email VARCHAR(30) UNIQUE NOT NULL,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP 
 	);
 	
 	CREATE TABLE IF NOT EXISTS sessions (
 		id SERIAL PRIMARY KEY,
-		user_id INT REFERENCES users(id) NOT NULL, 
+		user_id UUID REFERENCES users(id) NOT NULL, 
 		device_type VARCHAR(15) NOT NULL,
 		created_at TIMESTAMP   
 	)

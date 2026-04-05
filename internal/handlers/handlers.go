@@ -120,7 +120,7 @@ func (h *Handlers) SignIn(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/user/listCV", http.StatusSeeOther)
 }
 
-func (h *Handlers) parseCVForm(id int, r *http.Request) (*ent.CV, error) {
+func (h *Handlers) parseCVForm(id string, r *http.Request) (*ent.CV, error) {
 	cv := &ent.CV{}
 
 	age := r.FormValue("age")
@@ -229,8 +229,6 @@ func (h *Handlers) ListCV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Println("Professions: ", Profs)
-
 	cvs := h.handleProfessions(Profs, id)
 
 	log.Println("CVs: ", len(cvs))
@@ -329,7 +327,13 @@ func (h *Handlers) DeleteCV(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handlers) AuthMiddleWare(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var ID any = "id"
+		RequestID := utils.GenRequestID()
+
+		var (
+			ID           any = "id"
+			KeyRequestID any = "X-Request-ID"
+		)
+
 		cookieJWT, err := r.Cookie("JWT")
 		if err == http.ErrNoCookie {
 			http.Error(w, "Session expired", http.StatusUnauthorized)
@@ -344,7 +348,12 @@ func (h *Handlers) AuthMiddleWare(next http.Handler) http.Handler {
 			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
 		}
+
+		w.Header().Set(KeyRequestID.(string), RequestID)
+
 		ctx := context.WithValue(r.Context(), ID, claims.UserID)
+		ctx = context.WithValue(r.Context(), KeyRequestID, RequestID)
+
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -534,18 +543,18 @@ func (h *Handlers) DownloadPDF(w http.ResponseWriter, r *http.Request) {
 	log.Println("PDF is successfully created: CV.pdf")
 }
 
-func getUserSession(r *http.Request) (int, error) {
+func getUserSession(r *http.Request) (string, error) {
 	token, err := r.Cookie("JWT")
 	if token.Value == "" {
-		return 0, errors.New("cookie is empty: session deleted")
+		return "", errors.New("cookie is empty: session deleted")
 	}
 	if err != nil {
-		return 0, errors.New("cookie error")
+		return "", errors.New("cookie error")
 	}
 
 	claims, err := auth.ValidateJWT(token.Value)
 	if err != nil {
-		return 0, errors.New("bad cookie")
+		return "", errors.New("bad cookie")
 	}
 	return claims.UserID, nil
 }
@@ -575,7 +584,7 @@ func clearCookie(w http.ResponseWriter, cookieName string) {
 	http.SetCookie(w, cookie)
 }
 
-func (h *Handlers) getUserCV(id int, prof string) (*ent.CV, error) {
+func (h *Handlers) getUserCV(id string, prof string) (*ent.CV, error) {
 	searchCV, existed := h.cash.Get(prof, id)
 	if !existed {
 		redisCV, err := h.srv.GetDataCV(id, prof)
@@ -587,7 +596,7 @@ func (h *Handlers) getUserCV(id int, prof string) (*ent.CV, error) {
 	return searchCV, nil
 }
 
-func (h *Handlers) handleProfessions(Profs []string, id int) []ent.CV {
+func (h *Handlers) handleProfessions(Profs []string, id string) []ent.CV {
 	CVs := make([]ent.CV, 0, len(Profs))
 
 	for _, pr := range Profs {

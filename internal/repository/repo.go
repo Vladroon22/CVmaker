@@ -29,39 +29,40 @@ func NewRepo(db *database.DataBase, r *database.Redis) *Repo {
 	}
 }
 
-func (rp *Repo) Login(c context.Context, pass, email string) (int, error) {
+func (rp *Repo) Login(c context.Context, pass, email string) (string, error) {
 	ctx, cancel := context.WithTimeout(c, time.Second*15)
 	defer cancel()
 
 	var (
-		id                int
+		id                string
 		hash, storedEmail string
 	)
 
 	pool := rp.db.GetPool()
 
-	query1 := "SELECT id, email, hash_password FROM users WHERE email = $1"
-	if err := pool.QueryRow(ctx, query1, email).Scan(&id, &storedEmail, &hash); err != nil {
+	args := pgx.NamedArgs{"email": email}
+	query := "SELECT id, email, hash_password FROM users WHERE email = @email"
+	if err := pool.QueryRow(ctx, query, args).Scan(&id, &storedEmail, &hash); err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			log.Println("bad resp: ", err)
-			return 0, errors.New("bad response from database")
+			return "", errors.New("bad response from database")
 		}
 	}
 
 	if storedEmail != email {
 		log.Println("no such user's email")
-		return 0, errors.New("no such user's email")
+		return "", errors.New("no such user's email")
 	}
 
 	if err := utils.CheckPassAndHash(hash, pass); err != nil {
 		log.Println(err)
-		return 0, errors.New("wrong password input")
+		return "", errors.New("wrong password input")
 	}
 
 	return id, nil
 }
 
-func (rp *Repo) SaveSession(c context.Context, id int, device string) error {
+func (rp *Repo) SaveSession(c context.Context, id string, device string) error {
 	ctx, cancel := context.WithTimeout(c, time.Second*15)
 	defer cancel()
 
@@ -81,22 +82,31 @@ func (rp *Repo) SaveSession(c context.Context, id int, device string) error {
 	}()
 
 	var cnt int
-	query1 := "SELECT COUNT(*) FROM sessions WHERE user_id = $1"
-	if err := tx.QueryRow(ctx, query1, id).Scan(&cnt); err != nil {
+	args1 := pgx.NamedArgs{"id": id}
+	query1 := "SELECT COUNT(*) FROM sessions WHERE user_id = @id"
+	if err := tx.QueryRow(ctx, query1, args1).Scan(&cnt); err != nil {
 		log.Println("Tx to select (session): ", err)
 		return errors.New("bad response from database")
 	}
 
 	if cnt >= 4 {
-		query2 := "DELETE FROM sessions WHERE user_id = $1"
-		if _, err := tx.Exec(ctx, query2, id); err != nil {
+		args2 := pgx.NamedArgs{"id": id}
+		query2 := "DELETE FROM sessions WHERE user_id = @id"
+		if _, err := tx.Exec(ctx, query2, args2); err != nil {
 			log.Println("Tx to delete (session): ", err)
 			return errors.New("bad response from database")
 		}
 	}
 
-	query3 := "INSERT INTO sessions (user_id, device_type, created_at) VALUES ($1, $2, $3)"
-	if _, err := tx.Exec(ctx, query3, id, device, time.Now().UTC()); err != nil {
+	now := time.Now().UTC()
+	args3 := pgx.NamedArgs{
+		"id":         id,
+		"device":     device,
+		"created_at": now,
+	}
+
+	query3 := "INSERT INTO sessions (user_id, device_type, created_at) VALUES (@id, @device, @created_at)"
+	if _, err := tx.Exec(ctx, query3, args3); err != nil {
 		log.Println("Tx to insert (session): ", errTx)
 		return errors.New("bad response from database")
 	}
@@ -132,8 +142,9 @@ func (rp *Repo) CreateUser(c context.Context, user *ent.UserInput) error {
 		}
 	}()
 
-	query1 := "SELECT email FROM users WHERE email = $1"
-	if errRows := tx.QueryRow(ctx, query1, user.Email).Scan(&emailStored); errRows != nil {
+	args1 := pgx.NamedArgs{"email": user.Email}
+	query1 := "SELECT email FROM users WHERE email = @email"
+	if errRows := tx.QueryRow(ctx, query1, args1).Scan(&emailStored); errRows != nil {
 		if !errors.Is(errRows, sql.ErrNoRows) {
 			log.Println("bad resp (rows): ", errRows)
 			return errors.New("bad response from database")
@@ -151,8 +162,14 @@ func (rp *Repo) CreateUser(c context.Context, user *ent.UserInput) error {
 		return errors.New("hashing password error")
 	}
 
-	query := "INSERT INTO users (name, email, hash_password) VALUES ($1, $2, $3)"
-	if _, err := tx.Exec(ctx, query, user.Name, user.Email, string(enc_pass)); err != nil {
+	args2 := pgx.NamedArgs{
+		"name":  user.Name,
+		"email": user.Email,
+		"hash":  string(enc_pass),
+	}
+
+	query2 := "INSERT INTO users (name, email, hash_password) VALUES (@name, @email, @hash)"
+	if _, err := tx.Exec(ctx, query2, args2); err != nil {
 		log.Println("Tx to insert (create user): ", err)
 		return errors.New("bad response from database")
 	}
@@ -172,29 +189,26 @@ func (rp *Repo) AddNewCV(cv *ent.CV) error {
 		log.Println(err)
 		return err
 	}
-	key := fmt.Sprintf("job:%s:id:%d", cv.Profession, cv.ID)
+	key := fmt.Sprintf("job:%s:id:%s", cv.Profession, cv.ID)
 	if err := rp.red.SetData(key, string(jsonData), utils.TTLofCV); err != nil {
 		log.Println(err)
 		return err
 	}
-	//jobEntry := fmt.Sprintf("%s:%d", cv.Profession, cv.ID)
-	//rp.red.Make("lpush", "jobs", jobEntry)
+
 	log.Println("CV successfully added in redis")
 	return nil
 }
 
-func (rp *Repo) GetProfessions(id int) ([]string, error) {
+func (rp *Repo) GetProfessions(id string) ([]string, error) {
 	professions := []string{}
 
 	jobs, _ := rp.red.IterateWithPattern("job:*:id:*")
-	log.Println(jobs)
 
 	chJobs := make(chan string, len(jobs))
 	wg := &sync.WaitGroup{}
 	for _, job := range jobs {
 		wg.Add(1)
 		go func(job string) {
-			log.Println(job)
 			defer wg.Done()
 			cv, err := rp.GetDataCV(id, job)
 			if err != nil {
@@ -221,7 +235,7 @@ func (rp *Repo) GetProfessions(id int) ([]string, error) {
 	return professions, nil
 }
 
-func (rp *Repo) GetDataCV(id int, prof string) (*ent.CV, error) {
+func (rp *Repo) GetDataCV(id string, prof string) (*ent.CV, error) {
 	keys := strings.Split(prof, ":")
 	key := fmt.Sprintf("job:%s:id:%s", keys[1], keys[3])
 
@@ -241,8 +255,8 @@ func (rp *Repo) GetDataCV(id int, prof string) (*ent.CV, error) {
 	return cv, nil
 }
 
-func (rp *Repo) DeleteCV(id int, prof string) error {
-	key := fmt.Sprintf("job:%s:id:%d", prof, id)
+func (rp *Repo) DeleteCV(id, prof string) error {
+	key := fmt.Sprintf("job:%s:id:%s", prof, id)
 	rp.red.Make("del", key)
 	return nil
 }

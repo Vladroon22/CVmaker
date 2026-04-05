@@ -10,10 +10,10 @@ import (
 
 type JwtClaims struct {
 	jwt.StandardClaims
-	UserID int
+	UserID string
 }
 
-func GenerateJWT(id int) (string, error) {
+func GenerateJWT(id string) (string, error) {
 	JWT, err := jwt.NewWithClaims(jwt.SigningMethodHS256, &JwtClaims{
 		jwt.StandardClaims{
 			ExpiresAt: time.Now().Add(utils.TTLofJWT).UTC().Unix(), // TTL of token

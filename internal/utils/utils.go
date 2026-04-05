@@ -8,6 +8,7 @@ import (
 	"time"
 
 	ent "github.com/Vladroon22/CVmaker/internal/entity"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -93,4 +94,8 @@ func Valid(user *ent.UserInput) error {
 		return errors.New("name is too long")
 	}
 	return nil
+}
+
+func GenRequestID() string {
+	return uuid.Must(uuid.NewV7()).String()
 }

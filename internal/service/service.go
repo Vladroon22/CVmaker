@@ -7,13 +7,13 @@ import (
 )
 
 type Servicer interface {
-	SaveSession(context.Context, int, string) error
-	Login(context.Context, string, string) (int, error)
+	SaveSession(context.Context, string, string) error
+	Login(context.Context, string, string) (string, error)
 	CreateUser(context.Context, *ent.UserInput) error
-	GetProfessions(int) ([]string, error)
-	GetDataCV(int, string) (*ent.CV, error)
+	GetProfessions(string) ([]string, error)
+	GetDataCV(string, string) (*ent.CV, error)
 	AddNewCV(*ent.CV) error
-	DeleteCV(int, string) error
+	DeleteCV(string, string) error
 }
 
 type Service struct {
@@ -24,11 +24,11 @@ func NewService(repo Servicer) Servicer {
 	return &Service{repo: repo}
 }
 
-func (s *Service) SaveSession(c context.Context, id int, device string) error {
+func (s *Service) SaveSession(c context.Context, id string, device string) error {
 	return s.repo.SaveSession(c, id, device)
 }
 
-func (s *Service) Login(c context.Context, pass, email string) (int, error) {
+func (s *Service) Login(c context.Context, pass, email string) (string, error) {
 	return s.repo.Login(c, pass, email)
 }
 
@@ -36,11 +36,11 @@ func (s *Service) CreateUser(c context.Context, user *ent.UserInput) error {
 	return s.repo.CreateUser(c, user)
 }
 
-func (s *Service) GetProfessions(id int) ([]string, error) {
+func (s *Service) GetProfessions(id string) ([]string, error) {
 	return s.repo.GetProfessions(id)
 }
 
-func (s *Service) GetDataCV(id int, item string) (*ent.CV, error) {
+func (s *Service) GetDataCV(id string, item string) (*ent.CV, error) {
 	return s.repo.GetDataCV(id, item)
 }
 
@@ -48,6 +48,6 @@ func (s *Service) AddNewCV(cv *ent.CV) error {
 	return s.repo.AddNewCV(cv)
 }
 
-func (s *Service) DeleteCV(id int, item string) error {
+func (s *Service) DeleteCV(id, item string) error {
 	return s.repo.DeleteCV(id, item)
 }

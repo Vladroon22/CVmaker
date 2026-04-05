@@ -9,7 +9,7 @@ type UserInput struct {
 }
 
 type CV struct {
-	ID          int      `json:"id"`
+	ID          string   `json:"id"`
 	Name        string   `json:"name"`
 	Age         int      `json:"age"`
 	Profession  string   `json:"profession"`
