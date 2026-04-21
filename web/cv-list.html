@@ -3,247 +3,456 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CV List</title>
-    <link rel="stylesheet" href="/static/cv-style.css"> 
+    <title>✨ CV list </title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
+        * {
             margin: 0;
-            padding: 20px;
-        }
-    
-        .content {
-            display: none;
-            max-width: 600px;
-            margin: auto;
-            background: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', 'Poppins', system-ui, sans-serif;
         }
 
-        .container {
-            max-width: 800px;
-            margin: auto;
-            background: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        body {
+            min-height: 100vh;
+            background: linear-gradient(145deg, #1a2639 0%, #2a3b4c 45%, #3e5c6b 100%);
+            background-attachment: fixed;
+            padding: 2rem;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(255, 215, 120, 0.3) 0%, rgba(255, 140, 200, 0.15) 80%);
+            border-radius: 50%;
+            top: -100px;
+            right: -100px;
+            z-index: 0;
+            filter: blur(80px);
+            animation: floatGlow 12s infinite alternate ease-in-out;
+        }
+
+        body::after {
+            content: "";
+            position: fixed;
+            width: 450px;
+            height: 450px;
+            background: radial-gradient(circle, #6ec3ff25 0%, #a17fe025 70%);
+            border-radius: 50%;
+            bottom: -120px;
+            left: -120px;
+            z-index: 0;
+            filter: blur(90px);
+            animation: floatGlow2 15s infinite alternate;
+        }
+
+        @keyframes floatGlow {
+            0% { transform: translate(0, 0) scale(1); opacity: 0.5; }
+            100% { transform: translate(-60px, 40px) scale(1.2); opacity: 0.8; }
+        }
+        @keyframes floatGlow2 {
+            0% { transform: translate(0, 0) scale(1); opacity: 0.4; }
+            100% { transform: translate(70px, -50px) scale(1.3); opacity: 0.7; }
+        }
+
+        .main-wrapper {
+            max-width: 1000px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 10;
+        }
+
+        .container, .content {
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border-radius: 40px;
+            padding: 2.5rem;
+            box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.4),
+                        0 0 0 1px rgba(255, 255, 255, 0.3) inset,
+                        0 10px 30px rgba(255, 215, 150, 0.15);
+            border: 1px solid rgba(255, 240, 200, 0.3);
+            animation: slideUp 0.5s ease-out;
+            margin-bottom: 2rem;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            text-align: center;
+            background: linear-gradient(135deg, #1e2b3c, #3f2e4e, #1f4e6f);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin-bottom: 2rem;
+            letter-spacing: -0.5px;
+            position: relative;
+        }
+
+        h1::after {
+            content: "";
+            display: block;
+            width: 80px;
+            height: 4px;
+            background: linear-gradient(90deg, #f6b26b, #f4a261, #d08c5b);
+            margin: 15px auto 0;
+            border-radius: 10px;
+        }
+
+        .lbl {
+            display: block;
+            width: fit-content;
+            margin: 0 auto 2rem;
+            padding: 16px 40px;
+            background: linear-gradient(145deg, #2e5a7f, #1f3f5c);
+            color: #fcf3e6;
+            font-size: 1.2rem;
+            font-weight: 700;
+            border-radius: 60px;
+            cursor: pointer;
+            text-align: center;
+            box-shadow: 0 12px 24px -6px #102433, 0 0 0 2px #b9d6f0 inset;
+            transition: all 0.25s;
+            letter-spacing: 1px;
+            border: 1px solid rgba(255, 225, 180, 0.4);
+        }
+
+        .lbl:hover {
+            background: linear-gradient(145deg, #3e6d99, #264b6b);
+            transform: translateY(-3px);
+            box-shadow: 0 18px 30px -8px #0e1f2f, 0 0 0 3px #efcba1 inset;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0 12px;
+        }
+
+        thead tr {
+            background: transparent;
+        }
+
+        th {
+            padding: 1rem 1.5rem;
+            text-align: left;
+            font-weight: 700;
+            color: #2c3e4e;
+            font-size: 1.1rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 2px solid #e5985c;
+        }
+
+        tbody tr {
+            background: rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(8px);
+            border-radius: 60px;
+            transition: all 0.2s;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        tbody tr:hover {
+            background: rgba(255, 255, 255, 0.8);
+            transform: scale(1.01);
+            box-shadow: 0 8px 20px rgba(244, 162, 97, 0.2);
+        }
+
+        td {
+            padding: 0.8rem 1.5rem;
+            border-radius: 60px 0 0 60px;
+        }
+
+        .prof {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .prof form {
+            display: inline-block;
+        }
+
+        .btn-table {
+            padding: 10px 22px;
+            border-radius: 40px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.95rem;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-view {
+            background: linear-gradient(145deg, #4a90e2, #357abd);
+            color: white;
+        }
+
+        .btn-view:hover {
+            background: linear-gradient(145deg, #5ba0f0, #4a90e2);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 18px #357abd60;
+        }
+
+        .btn-delete {
+            background: linear-gradient(145deg, #ff6b6b, #e63946);
+            color: white;
+        }
+
+        .btn-delete:hover {
+            background: linear-gradient(145deg, #ff8585, #ff4b5c);
+            transform: translateY(-2px);
+        }
+
+        .btn-download {
+            background: linear-gradient(145deg, #50b884, #3a9d6e);
+            color: white;
+        }
+
+        .btn-download:hover {
+            background: linear-gradient(145deg, #60c994, #4aad7e);
+            transform: translateY(-2px);
         }
 
         .input-group {
-            margin-bottom: 15px;
+            margin-bottom: 1.5rem;
         }
 
         .input-group label {
             display: block;
-            font-weight: bold;
-            margin-bottom: 5px;
+            margin-left: 8px;
+            margin-bottom: 6px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #2c3e4e;
+            font-size: 0.9rem;
         }
 
         .input-group input {
             width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            box-sizing: border-box;
-        }
-        .lbl {
-            width: 100%;
-            padding: 10px;
-            background-color: #4CAF50;
-            color: white;
-            font-size: 16px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
+            padding: 14px 18px;
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(8px);
+            border: 1.5px solid rgba(180, 200, 220, 0.6);
+            border-radius: 50px;
+            font-size: 1rem;
+            transition: all 0.25s;
         }
 
-        .lbl:hover {
-            background-color: #45a049;
+        .input-group input:focus {
+            border-color: #e5985c;
+            outline: none;
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 0 0 5px rgba(244, 162, 97, 0.15);
+        }
+
+        .salary-row {
+            display: flex;
+            gap: 15px;
+        }
+
+        .salary-row input:first-child {
+            flex: 3;
+        }
+
+        .salary-row input:last-child {
+            flex: 1;
         }
 
         .btn {
-            display: block;
             width: 100%;
-            padding: 10px;
-            background-color: #4CAF50;
+            padding: 16px;
+            background: linear-gradient(145deg, #e48c4b, #cf7a3a);
             color: white;
+            font-size: 1.2rem;
+            font-weight: 700;
             border: none;
-            border-radius: 4px;
+            border-radius: 60px;
             cursor: pointer;
+            box-shadow: 0 12px 20px -8px #b45f2e, 0 3px 0 #9f5e2e inset;
+            transition: all 0.2s;
+            margin-top: 10px;
         }
 
         .btn:hover {
-            background-color: #45a049;
+            background: linear-gradient(145deg, #f39c5c, #e0843e);
+            transform: translateY(-3px);
         }
 
-        #toggleCreateCV:checked ~ .content {
-            display: block;
+        .btn-secondary {
+            background: linear-gradient(145deg, #5a7a9a, #3e5f7a);
+            box-shadow: 0 12px 20px -8px #2c4a63, 0 3px 0 #2a455a inset;
+            margin-top: 15px;
         }
 
-        #toggleCreateCV:checked ~ .container {
+        .logout-section {
+            display: flex;
+            justify-content: center;
+            margin-top: 1rem;
+        }
+
+        #logoutButton {
+            background: linear-gradient(145deg, #ff6b6b, #e63946);
+            color: white;
+            border: none;
+            padding: 14px 40px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            border-radius: 60px;
+            cursor: pointer;
+            box-shadow: 0 12px 24px -8px #c0392b, 0 3px 0 #a93226 inset;
+            transition: all 0.2s;
+        }
+
+        #logoutButton:hover {
+            background: linear-gradient(145deg, #ff8585, #ff4b5c);
+            transform: translateY(-3px);
+        }
+
+        .content {
             display: none;
+        }
+
+        #toggleCreateCV:checked ~ .main-wrapper .container {
+            display: none;
+        }
+
+        #toggleCreateCV:checked ~ .main-wrapper .content {
+            display: block;
         }
 
         #toggleCreateCV {
             display: none;
         }
 
-        .ex {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background-color: #f5f5f5; 
+        @media (max-width: 700px) {
+            body { padding: 1rem; }
+            .container, .content { padding: 1.5rem; }
+            h1 { font-size: 2rem; }
+            .prof { flex-direction: column; align-items: stretch; }
+            .btn-table { width: 100%; }
+            .salary-row { flex-direction: column; gap: 10px; }
         }
-
-        .exit {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background-color: #ffffff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); 
-        }
-
-        #logoutButton {
-            background-color: #ff4b5c; 
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            font-size: 16px;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background-color 0.3s ease; 
-        }
-
-        #logoutButton:hover {
-            background-color: #e63946; 
-        }
-
-        #logoutButton:active {
-            background-color: #d62828; 
-        }
-
-        #sal {
-            width: 85%;
-        }
-        #currency {
-            width: 80px; 
-        }
-
-        .download {
-            text-align: right;
-        }
-        .prof {
-            display: flex;
-            gap: 278px;
-        }
-
     </style>
 </head>
 <body>
-    
     <input type="checkbox" id="toggleCreateCV">
-    <div class="container">
-        <h1>List of CVs</h1>
-        <label for="toggleCreateCV" class="lbl">Create New CV</label>
-        <table>
-            <thead>
-                <tr>
-                    <th>Profession</th> 
-                </tr>
-            </thead>
-            <tbody>
-                {{range .}}
-                <tr>
-                    <td>
-                        <div class="prof">
-                        <form action="/user/profile" method="GET">
-                            <input type="hidden" name="profession" value="{{.Profession}}">
-                            <button type="submit">{{.Profession}}</button>
-                        </form>
-                        <form action="/user/deleteCV" method="GET">
-                            <input type="hidden" name="profession" value="{{.Profession}}">
-                            <button type="submit">Delete CV</button>
-                        </form>
-                        <form class="download" action="/user/downloadCV" method="GET">
-                            <input type="hidden" name="profession" value="{{.Profession}}">
-                            <button type="submit">Download PDF</button>
-                        </form>
-                        </div>
-                    </td> 
-                </tr>
-                {{end}}
-            </tbody>
-        </table>
-    </div>
-
-    <div class="content"> 
-        <h1>Create Your CV</h1>
-        <form method="POST" action="/user/makeCV">
-            <div class="input-group">
-                <label for="profession">Profession</label>
-                <input type="text" id="profession" name="profession" placeholder="Enter profession" required>
-            </div>
-            <div class="input-group">
-                <label for="username">Name</label>
-                <input type="text" id="username" name="name" placeholder="Enter name" required>
-            </div>
-            <div class="input-group">
-                <label for="surname">Surname</label>
-                <input type="text" id="surname" name="surname" placeholder="Enter your surname" required>
-            </div>
-            <div class="input-group">
-                <label for="phone">Phone</label>
-                <input type="text" id="phone" name="phone" placeholder="Enter your phone" required>
-            </div>
-            <div class="input-group">
-                <label for="phone">Date of birth</label>
-                <input type="text" id="age" name="age" placeholder="example xx.xx.xxxx" required>
-            </div>
-            <div class="input-group">
-                <label for="salary">Salary</label>
-                <input type="text" id="sal" name="salary" placeholder="Enter prefered salary">
-                <input type="text" id="currency" name="currency" placeholder="Currency">
-            </div>
-            <div class="input-group">
-                <label for="city">City</label>
-                <input type="text" id="city" name="city" placeholder="Enter your city" required>
-            </div>
-            <div class="input-group">
-                <label for="emailcv">Email</label>
-                <input type="text" id="emailcv" name="emailcv" placeholder="example@email.com" required>
-            </div>
-            <div class="input-group">
-                <label for="education">Education</label>
-                <input type="text" id="education" name="education" placeholder="Bachelor degree, Ph.d, etc..." required>
-            </div>
-            <div class="input-group">
-                <label for="hardskills">Hard Skills</label>
-                <input type="text" id="hardskills" name="hardskills" placeholder="example C/C++ Python etc..." required>
-            </div>
-            <div class="input-group">
-                <label for="softskills">Soft Skills</label>
-                <input type="text" id="softskills" name="softskills" placeholder="example Confident Smart etc...">
-            </div>
-            <div class="input-group">
-                <label for="description">Description</label>
-                <input type="text" id="description" name="description" placeholder="Introduce youself" required>
-            </div>
-            <button type="submit" class="btn">Create it</button> 
-        </form>
-        <br>
-        <form action="/user/listCV" method="GET">
-            <button type="submit" class="btn">View CV List</button>
-        </form>
-    </div>
-    <form class="ex" action="/logout" method="get">
-        <div class="exit">
-            <button id="logoutButton">Log Out</button>
+    
+    <div class="main-wrapper">
+        <div class="container">
+            <h1>📄 My CVs</h1>
+            <label for="toggleCreateCV" class="lbl">✨ Create New CV</label>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>💼 Profession</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .}}
+                    <tr>
+                        <td>
+                            <div class="prof">
+                                <form action="/user/profile" method="GET">
+                                    <input type="hidden" name="profession" value="{{.Profession}}">
+                                    <button type="submit" class="btn-table btn-view">👁️ View</button>
+                                </form>
+                                <form action="/user/deleteCV" method="GET">
+                                    <input type="hidden" name="profession" value="{{.Profession}}">
+                                    <button type="submit" class="btn-table btn-delete">🗑️ Delete</button>
+                                </form>
+                                <form action="/user/downloadCV" method="GET">
+                                    <input type="hidden" name="profession" value="{{.Profession}}">
+                                    <button type="submit" class="btn-table btn-download">📥 Download PDF</button>
+                                </form>
+                                <span style="margin-left: auto; font-weight: 600; color: #2c3e4e;">{{.Profession}}</span>
+                            </div>
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
         </div>
-    </form>
+
+        <div class="content">
+            <h1>✨ Creation of CV</h1>
+            <form method="POST" action="/user/makeCV">
+                <div class="input-group">
+                    <label>💼 Profession</label>
+                    <input type="text" name="profession" placeholder="example: Frontend Developer" required>
+                </div>
+                <div class="input-group">
+                    <label>👤 Name</label>
+                    <input type="text" name="name" placeholder="Ivan" required>
+                </div>
+                <div class="input-group">
+                    <label>👥 Surname</label>
+                    <input type="text" name="surname" placeholder="Ivanov" required>
+                </div>
+                <div class="input-group">
+                    <label>📱 Phone number</label>
+                    <input type="text" name="phone" placeholder="+7 (999) 123-45-67" required>
+                </div>
+                <div class="input-group">
+                    <label>🎂 Date of birth</label>
+                    <input type="text" name="age" placeholder="DD.MM.YYYY" required>
+                </div>
+                <div class="input-group">
+                    <label>💰 Salary expectations</label>
+                    <div class="salary-row">
+                        <input type="text" name="salary" placeholder="Income" required>
+                        <input type="text" name="currency" placeholder="RUB/USD/EUR" required>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>📍 City</label>
+                    <input type="text" name="city" placeholder="Moscow" required>
+                </div>
+                <div class="input-group">
+                    <label>📧 Email</label>
+                    <input type="email" name="emailcv" placeholder="work@email.com" required>
+                </div>
+                <div class="input-group">
+                    <label>🎓 Education</label>
+                    <input type="text" name="education" placeholder="Bachelor/Master/PhD" required>
+                </div>
+                <div class="input-group">
+                    <label>🛠️ Hard Skills (please write it separately by space)</label>
+                    <input type="text" name="hardskills" placeholder="Python, JavaScript, SQL" required>
+                </div>
+                <div class="input-group">
+                    <label>🤝 Soft Skills (please write it separately by space)</label>
+                    <input type="text" name="softskills" placeholder="Communication skill, leadership">
+                </div>
+                <div class="input-group">
+                    <label>📋 Briefly About myself</label>
+                    <input type="text" name="description" placeholder="briefly describe yourself" required>
+                </div>
+                <button type="submit" class="btn">🚀 Create CV</button>
+            </form>
+            <form action="/user/listCV" method="GET">
+                <button type="submit" class="btn btn-secondary">📋 Back to list</button>
+            </form>
+        </div>
+
+        <div class="logout-section">
+            <form action="/logout" method="get">
+                <button id="logoutButton" type="submit">🚪 Log out</button>
+            </form>
+        </div>
+    </div>
 </body>
 </html>

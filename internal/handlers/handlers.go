@@ -409,7 +409,17 @@ func (h *Handlers) DownloadPDF(w http.ResponseWriter, r *http.Request) {
 
 	pdf := &gopdf.GoPdf{}
 	pdf.Start(gopdf.Config{PageSize: *gopdf.PageSizeA4})
+
 	pdf.AddPage()
+
+	pdf.SetFillColor(250, 250, 252)
+	pdf.Rectangle(0, 0, 595.28, 841.89, "F", 0.0, 0)
+
+	pdf.SetFillColor(230, 140, 75)
+	pdf.Rectangle(0, 0, 595.28, 8, "F", 0.0, 0)
+
+	pdf.SetFillColor(47, 69, 89)
+	pdf.Rectangle(0, 833.89, 595.28, 8, "F", 0.0, 0)
 
 	family := os.Getenv("family")
 	if err := pdf.AddTTFFont(family, os.Getenv("ttfpath")); err != nil {
@@ -418,118 +428,227 @@ func (h *Handlers) DownloadPDF(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := pdf.SetFont(family, "", 12); err != nil {
-		http.Error(w, "Error of creating pdf-file", http.StatusInternalServerError)
-		log.Println(err)
-		return
+	boldFamily := os.Getenv("family")
+	boldPath := os.Getenv("ttfpath")
+	hasBold := false
+	if boldFamily != "" && boldPath != "" {
+		if err := pdf.AddTTFFont(boldFamily, boldPath); err == nil {
+			hasBold = true
+		}
 	}
 
-	yPos := 20
-	lineHeight := 27
+	yPos := 50.0
+	lineHeight := 22.0
+	leftMargin := 40.0
 
-	addTitle := func(text string) {
-		pdf.SetFont(family, "", 16)
-		pdf.SetX(230)
-		pdf.SetY(float64(yPos))
+	addSectionTitle := func(text string) {
+		pdf.SetFillColor(230, 140, 75)
+		pdf.Rectangle(leftMargin-10, yPos-2, 5, 18, "F", 0.0, 0)
+
+		if hasBold {
+			pdf.SetFont(boldFamily, "", 14)
+		} else {
+			pdf.SetFont(family, "", 14)
+		}
+		pdf.SetTextColor(44, 62, 80)
+		pdf.SetX(leftMargin)
+		pdf.SetY(yPos)
 		pdf.Cell(nil, text)
-		yPos += lineHeight + 15
+		yPos += lineHeight + 10
+		pdf.SetFont(family, "", 11)
+		pdf.SetTextColor(60, 70, 85)
 	}
 
-	addText := func(label, value string) {
-		pdf.SetFont(family, "", 12)
-		pdf.SetX(20)
-		pdf.SetY(float64(yPos))
-		pdf.Cell(nil, label+": "+value)
-		yPos += lineHeight
+	addInfoRow := func(label, value string) {
+		pdf.SetFillColor(248, 249, 250)
+		pdf.Rectangle(leftMargin-5, yPos-3, 500, 20, "F", 0.0, 0)
+
+		if hasBold {
+			pdf.SetFont(boldFamily, "", 11)
+		} else {
+			pdf.SetFont(family, "", 11)
+		}
+		pdf.SetTextColor(230, 140, 75)
+		pdf.SetX(leftMargin)
+		pdf.SetY(yPos)
+		pdf.Cell(nil, label+":")
+
+		pdf.SetFont(family, "", 11)
+		pdf.SetTextColor(44, 62, 80)
+		pdf.SetX(leftMargin + 120)
+		pdf.SetY(yPos)
+		pdf.Cell(nil, value)
+		yPos += lineHeight + 5
 	}
 
-	addTitle(cv.Name + " " + cv.Surname)
-	addText("Profession", cv.Profession)
-	addText("Age", strconv.Itoa(cv.Age))
-	addText("Living City", cv.LivingCity)
-	addText("Salary Expectation", strconv.Itoa(cv.Salary))
-	addText("Email", cv.EmailCV)
-	addText("Phone", cv.PhoneNumber)
-	addText("Education", cv.Education)
-	yPos += 15
+	if hasBold {
+		pdf.SetFont(boldFamily, "", 24)
+	} else {
+		pdf.SetFont(family, "", 24)
+	}
+	pdf.SetTextColor(44, 62, 80)
+
+	nameText := cv.Name + " " + cv.Surname
+	nameWidth, _ := pdf.MeasureTextWidth(nameText)
+	pdf.SetX((595.28 - nameWidth) / 2)
+	pdf.SetY(yPos)
+	pdf.Cell(nil, nameText)
+
+	pdf.SetFillColor(230, 140, 75)
+	pdf.Rectangle((595.28-100)/2, yPos+25, 100, 3, "F", 0.0, 0)
+
+	yPos += 45
+
+	if hasBold {
+		pdf.SetFont(boldFamily, "", 16)
+	} else {
+		pdf.SetFont(family, "", 16)
+	}
+	pdf.SetTextColor(100, 120, 140)
+	profText := cv.Profession
+	profWidth, _ := pdf.MeasureTextWidth(profText)
+	pdf.SetX((595.28 - profWidth) / 2)
+	pdf.SetY(yPos)
+	pdf.Cell(nil, profText)
+
+	yPos += 35
+
+	addSectionTitle("📋 Personal Information")
+
+	col1Y := yPos
+	addInfoRow("Age", strconv.Itoa(cv.Age))
+	addInfoRow("Living City", cv.LivingCity)
+	addInfoRow("Email", cv.EmailCV)
+
+	yPos = col1Y
+	leftMargin = 320.0
+	addInfoRow("Phone", cv.PhoneNumber)
+	addInfoRow("Education", cv.Education)
+	addInfoRow("Salary Expectation", strconv.Itoa(cv.Salary)+" "+cv.Currency)
+
+	leftMargin = 40.0
+	yPos += 20
+
+	addSectionTitle("🤝 Soft Skills")
 
 	soft := []string{}
 	for _, sk := range cv.SoftSkills {
 		soft = append(soft, strings.Fields(sk)...)
 	}
 
-	pdf.SetFont(family, "", 12)
-	pdf.SetX(float64(20))
-	pdf.SetY(float64(yPos))
-	pdf.Cell(nil, "Soft Skills")
-	yPos += 15
+	skillX := leftMargin
+	skillY := yPos
+	for i, skill := range soft {
+		if i > 0 && i%3 == 0 {
+			skillY += 25
+			skillX = leftMargin
+		}
 
-	for _, skill := range soft {
-		pdf.SetX(30)
-		pdf.SetY(float64(yPos))
-		pdf.Cell(nil, "* "+skill)
-		yPos += 15
+		pdf.SetFillColor(240, 248, 255)
+		skillWidth := float64(len(skill)*7 + 30)
+		pdf.Rectangle(skillX, skillY, skillWidth, 20, "F", 0.0, 0)
+
+		pdf.SetStrokeColor(100, 180, 220)
+		pdf.SetLineWidth(1)
+		pdf.Rectangle(skillX, skillY, skillWidth, 20, "D", 0.0, 0)
+
+		pdf.SetFont(family, "", 10)
+		pdf.SetTextColor(44, 62, 80)
+		pdf.SetX(skillX + 15)
+		pdf.SetY(skillY + 4)
+		pdf.Cell(nil, skill)
+
+		skillX += skillWidth + 10
 	}
-	yPos += 25
 
-	pdf.SetFont(family, "", 12)
-	pdf.SetX(float64(20))
-	pdf.SetY(float64(yPos))
-	pdf.Cell(nil, "Hard Skills")
-	yPos += 15
+	yPos = skillY + 40
+
+	addSectionTitle("🛠️ Hard Skills")
 
 	hard := []string{}
 	for _, sk := range cv.HardSkills {
 		hard = append(hard, strings.Fields(sk)...)
 	}
 
-	for _, skill := range hard {
-		pdf.SetX(30)
-		pdf.SetY(float64(yPos))
-		pdf.Cell(nil, "* "+skill)
-		yPos += 15
+	skillX = leftMargin
+	skillY = yPos
+	for i, skill := range hard {
+		if i > 0 && i%3 == 0 {
+			skillY += 25
+			skillX = leftMargin
+		}
+
+		pdf.SetFillColor(255, 248, 240)
+		skillWidth := float64(len(skill)*7 + 30)
+		pdf.Rectangle(skillX, skillY, skillWidth, 20, "F", 0.0, 0)
+
+		pdf.SetStrokeColor(230, 140, 75)
+		pdf.SetLineWidth(1)
+		pdf.Rectangle(skillX, skillY, skillWidth, 20, "D", 0.0, 0)
+
+		// Текст тега
+		pdf.SetFont(family, "", 10)
+		pdf.SetTextColor(44, 62, 80)
+		pdf.SetX(skillX + 15)
+		pdf.SetY(skillY + 4)
+		pdf.Cell(nil, skill)
+
+		skillX += skillWidth + 10
 	}
+
+	yPos = skillY + 50
 
 	if cv.Description != "" {
-		yPos += 15
-		pdf.SetFont(family, "", 12)
-		pdf.SetX(float64(30))
-		pdf.SetY(float64(yPos))
-		pdf.Cell(nil, "Brief")
+		addSectionTitle("📝 About Me")
 
-		yPos += 20
-		pdf.SetFont(family, "", 12)
-		pdf.SetX(float64(20))
-		pdf.SetY(float64(yPos))
+		pdf.SetFillColor(248, 249, 250)
+		pdf.Rectangle(leftMargin-5, yPos-5, 500, 80, "F", 0.0, 0)
+
+		pdf.SetStrokeColor(200, 210, 220)
+		pdf.SetLineWidth(0.5)
+		pdf.Rectangle(leftMargin-5, yPos-5, 500, 80, "D", 0.0, 0)
+
+		pdf.SetFont(family, "", 11)
+		pdf.SetTextColor(60, 70, 85)
+		pdf.SetX(leftMargin + 10)
+		pdf.SetY(yPos + 5)
 
 		words := strings.Split(cv.Description, " ")
-		totalWords := len(words)
+		lineText := ""
+		maxWidth := 470.0
 
-		y := pdf.GetY()
-
-		for i, word := range words {
-			IsBreak := false
-
-			if strings.HasSuffix(word, ".") {
-				IsBreak = true
+		for _, word := range words {
+			testLine := lineText
+			if testLine != "" {
+				testLine += " "
 			}
+			testLine += word
 
-			if i > 0 && i%30 == 0 {
-				IsBreak = true
-			}
-
-			if IsBreak {
-				y++
-				pdf.SetY(float64(y))
-			}
-
-			pdf.Cell(nil, word)
-
-			if i < totalWords-1 && !IsBreak {
-				pdf.Cell(nil, " ")
+			width, _ := pdf.MeasureTextWidth(testLine)
+			if width > maxWidth {
+				pdf.SetX(leftMargin + 10)
+				pdf.Cell(nil, lineText)
+				yPos += 18
+				pdf.SetY(yPos)
+				lineText = word
+			} else {
+				lineText = testLine
 			}
 		}
+
+		if lineText != "" {
+			pdf.SetX(leftMargin + 10)
+			pdf.Cell(nil, lineText)
+		}
 	}
+
+	pdf.SetFont(family, "", 9)
+	pdf.SetTextColor(150, 160, 170)
+	footerText := "Generated by CV Maker • " + time.Now().Format("January 2, 2006")
+	footerWidth, _ := pdf.MeasureTextWidth(footerText)
+	pdf.SetX((595.28 - footerWidth) / 2)
+	pdf.SetY(810)
+	pdf.Cell(nil, footerText)
 
 	w.Header().Set("Content-Type", "application/pdf")
 	w.Header().Set("Content-Disposition", "attachment; filename=CV.pdf")
